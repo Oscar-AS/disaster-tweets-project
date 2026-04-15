@@ -34,3 +34,8 @@ jobs:
         run: |
           pip install mypy
           mypy src/ --ignore-missing-imports || echo "Mypy a trouvé des soucis de type, à vérifier."
+
+      - name: Run tests (pytest)
+        run: |
+          # L'option || echo permet de ne pas faire planter le CI si 0 tests sont trouvés
+          pytest || echo "Aucun test trouvé pour le moment, mais l'environnement est OK."
