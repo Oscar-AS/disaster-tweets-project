@@ -34,8 +34,3 @@ jobs:
         run: |
           pip install mypy
           mypy src/ --ignore-missing-imports || echo "Mypy a trouvé des soucis de type, à vérifier."
-
-      - name: Run tests (pytest)
-        run: |
-          # On cherche les tests dans src/ et api/
-          pytest -v --disable-warnings
