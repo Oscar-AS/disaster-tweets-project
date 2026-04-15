@@ -1,0 +1,41 @@
+name: Disaster Tweets CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip' # Accélère le CI en gardant les librairies en mémoire cache
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          # On installe ruff et pytest s'ils ne sont pas dans les requirements
+          pip install ruff pytest 
+
+      - name: Lint with ruff
+        run: ruff check .
+
+      - name: Type checking 
+        # Vérifie si les fonctions reçoivent les bons types de données
+        run: |
+          pip install mypy
+          mypy src/ --ignore-missing-imports || echo "Mypy a trouvé des soucis de type, à vérifier."
+
+      - name: Run tests (pytest)
+        run: |
+          # On cherche les tests dans src/ et api/
+          pytest -v --disable-warnings
