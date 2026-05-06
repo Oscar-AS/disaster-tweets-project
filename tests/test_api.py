@@ -1,10 +1,11 @@
 from fastapi.testclient import TestClient
 from main import app, clean_text_advanced
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import pandas as pd
 import numpy as np
 
+# On crée le client de test
 client = TestClient(app)
 
 def test_clean_text_advanced():
@@ -35,8 +36,8 @@ def test_predict_validation_error():
 
 @patch('main.model')
 def test_predict_endpoint_success(mock_model):
-    # On mocke le comportement de notre modèle MLflow pour éviter un vrai appel (et pour tester l'API de manière isolée)
-    # Imaginons que ce soit un modèle Keras qui renvoie un NumPy array de probabilités
+    # On mocke le comportement de notre modèle MLflow
+    # Keras 3 renvoie un NumPy array de probabilités
     mock_model.predict.return_value = np.array([[0.85]])
     
     response = client.post("/predict", json={
@@ -50,11 +51,13 @@ def test_predict_endpoint_success(mock_model):
     assert data["is_disaster"] is True
     assert data["confidence"] == 0.85
     assert data["clean_text"] == "Huge earthquake hits the city!"
+    assert "model_name" in data # Vérification du nouveau champ model_name
 
 @patch('main.model')
 def test_predict_endpoint_success_transformers_format(mock_model):
-    # Imaginons que ce soit un modèle Hugging Face qui renvoie un DataFrame
-    mock_model.predict.return_value = pd.DataFrame([{"label": "LABEL_1", "score": 0.95}])
+    # Test pour simuler un Transformer Hugging Face (qui renvoie un DataFrame ou une liste)
+    # On force une erreur sur le 1er try (Numpy) pour qu'il bascule sur le 2ème (DataFrame)
+    mock_model.predict.side_effect = [Exception("Numpy not supported"), pd.DataFrame([{"label": "LABEL_1", "score": 0.95}])]
     
     response = client.post("/predict", json={
         "text": "Building on fire"
@@ -65,6 +68,7 @@ def test_predict_endpoint_success_transformers_format(mock_model):
     assert data["is_disaster"] is True
     assert data["confidence"] == 0.95
     assert data["clean_text"] == "Building on fire"
+    assert "model_name" in data
 
 @patch('main.model')
 def test_predict_endpoint_empty_text(mock_model):

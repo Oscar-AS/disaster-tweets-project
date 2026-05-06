@@ -7,18 +7,30 @@ import dagshub
 import os
 import pandas as pd
 import numpy as np
+import builtins
+
+# PATCH WINDOWS : Force l'utilisation de l'encodage UTF-8 lors de la lecture des fichiers par Keras/MLflow.
+# Ceci corrige l'erreur "charmap codec can't decode byte" lors du chargement de la couche TextVectorization.
+_original_open = builtins.open
+def _utf8_open(*args, **kwargs):
+    mode = kwargs.get('mode', args[1] if len(args) > 1 else 'r')
+    if 'b' not in mode and 'encoding' not in kwargs:
+        kwargs['encoding'] = 'utf-8'
+    return _original_open(*args, **kwargs)
+builtins.open = _utf8_open
 
 # Initialisation de l'API
 app = FastAPI(
     title="Disaster Tweet Predictor API",
-    description="API de prédiction de désastres basée sur des tweets, propulsée par le meilleur modèle du MLflow Registry.",
+    description="API de prédiction de catastrophes basée sur des tweets, propulsée par le meilleur modèle du MLflow Registry.",
     version="1.0.0"
 )
 
 # Configuration globale
 MODEL_NAME = "Disaster_Tweet_Predictor_Prod"
-STAGE = "Production"
+ALIAS = "best_model"
 model = None
+model_run_name = "Inconnu"
 
 @app.on_event("startup")
 def load_model():
@@ -33,10 +45,17 @@ def load_model():
 
     # Chargement du modèle de production depuis MLflow
     try:
-        print(f"Téléchargement et chargement du modèle MLflow '{MODEL_NAME}' en mode '{STAGE}'...")
-        model_uri = f"models:/{MODEL_NAME}/{STAGE}"
+        print(f"Téléchargement et chargement du modèle MLflow '{MODEL_NAME}' avec l'alias '@{ALIAS}'...")
+        model_uri = f"models:/{MODEL_NAME}@{ALIAS}"
         model = mlflow.pyfunc.load_model(model_uri)
-        print("Modèle chargé en mémoire avec succès !")
+        
+        # Récupération du nom du modèle (Run Name)
+        client = mlflow.tracking.MlflowClient()
+        run = client.get_run(model.metadata.run_id)
+        global model_run_name
+        model_run_name = run.data.tags.get("mlflow.runName", "Modèle sans nom")
+        
+        print(f"Modèle chargé en mémoire avec succès ! Nom : {model_run_name}")
     except Exception as e:
         print(f"Attention: Impossible de charger le modèle depuis MLflow. L'API démarrera mais /predict renverra une erreur. Détail: {e}")
 
@@ -51,6 +70,7 @@ class PredictionOutput(BaseModel):
     is_disaster: bool
     confidence: float
     clean_text: str
+    model_name: str
 
 # --- PIPELINE DE PRÉTRAITEMENT ---
 
@@ -87,13 +107,11 @@ def predict_tweet(tweet: TweetInput):
     cleaned_text = clean_text_advanced(tweet.text)
     
     if not cleaned_text:
-        return PredictionOutput(is_disaster=False, confidence=0.0, clean_text="")
+        return PredictionOutput(is_disaster=False, confidence=0.0, clean_text="", model_name=model_run_name)
 
     try:
-        # Essai de format 1 : Pandas Series (format idéal pour Keras TextVectorization)
-        input_data = pd.Series([cleaned_text])
-        
-        # Le pyfunc de mlflow s'occupe du wrapping
+        # Format 1 : Numpy Array (Format requis par Keras 3 et accepté par la plupart des modèles)
+        input_data = np.array([cleaned_text])
         prediction = model.predict(input_data)
         
         confidence = 0.0
@@ -131,18 +149,58 @@ def predict_tweet(tweet: TweetInput):
         return PredictionOutput(
             is_disaster=is_disaster,
             confidence=confidence,
-            clean_text=cleaned_text
+            clean_text=cleaned_text,
+            model_name=model_run_name
         )
     except Exception as e:
-        # En cas d'erreur de format d'entrée, tentative avec un format list classique
+        # En cas d'erreur de format, essai 2 : DataFrame (Format standard absolu pour Sklearn et XGBoost via MLflow)
         try:
-            prediction = model.predict([cleaned_text])
+            df_input = pd.DataFrame({"text": [cleaned_text]})
+            prediction = model.predict(df_input)
             confidence = float(np.array(prediction).flatten()[0])
             is_disaster = confidence > 0.5
             return PredictionOutput(
                 is_disaster=is_disaster,
                 confidence=confidence,
-                clean_text=cleaned_text
+                clean_text=cleaned_text,
+                model_name=model_run_name
             )
         except Exception as e2:
-            raise HTTPException(status_code=500, detail=f"Erreur interne lors de la prédiction MLflow: {str(e)} / {str(e2)}")
+            # Essai 3 : Extraction du modèle natif (Bypass total du wrapper strict de MLflow)
+            try:
+                keras_model = None
+                if hasattr(model, '_model_impl'):
+                    impl = model._model_impl
+                    if hasattr(impl, 'keras_model'):
+                        keras_model = impl.keras_model
+                    elif hasattr(impl, 'get_raw_model'):
+                        keras_model = impl.get_raw_model()
+                
+                if keras_model is None:
+                    keras_model = model.unwrap_python_model()
+                    
+                # Keras 3 avec TensorFlow backend exige souvent un Tensor pour les chaînes de caractères
+                import tensorflow as tf
+                prediction = keras_model.predict(tf.constant([cleaned_text]))
+                confidence = float(np.array(prediction).flatten()[0])
+                is_disaster = confidence > 0.5
+                return PredictionOutput(
+                    is_disaster=is_disaster,
+                    confidence=confidence,
+                    clean_text=cleaned_text,
+                    model_name=model_run_name
+                )
+            except Exception as e3:
+                # Dernier recours ultime : la liste pure pour un transformer
+                try:
+                    prediction = model.predict([cleaned_text])
+                    confidence = float(np.array(prediction).flatten()[0])
+                    is_disaster = confidence > 0.5
+                    return PredictionOutput(
+                        is_disaster=is_disaster,
+                        confidence=confidence,
+                        clean_text=cleaned_text,
+                        model_name=model_run_name
+                    )
+                except Exception as e4:
+                    raise HTTPException(status_code=500, detail=f"Échec de tous les formats de prédiction.\n1(Numpy): {str(e)}\n2(DataFrame): {str(e2)}\n3(Keras natif): {str(e3)}\n4(Liste pure): {str(e4)}")

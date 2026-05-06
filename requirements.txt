@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+mlflow
+dagshub
+pandas
+numpy
+tensorflow
+emoji
+pydantic
