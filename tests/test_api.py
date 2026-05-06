@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from main import app, clean_text_advanced
+from API.main import app, clean_text_advanced
 import pytest
 from unittest.mock import patch, MagicMock
 import pandas as pd
