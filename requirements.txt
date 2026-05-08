@@ -1,9 +1,29 @@
-fastapi
-uvicorn[standard]
+# Utilitaires de base
+numpy==2.3.5
+pandas==2.3.3
+scipy==1.16.3
+
+# Machine Learning et Deep Learning
+tensorflow==2.21.0
+keras==3.14.0
+scikit-learn==1.8.0
+
+# Transformers et Hugging Face 
+transformers==5.6.2
+datasets==4.8.4
+
+# Suivi d'expériences
 mlflow==3.11.1
-dagshub
-pandas
-numpy
-tensorflow
-emoji
-pydantic
+dagshub==0.7.0
+
+# Visualisation
+matplotlib==3.10.0
+seaborn==0.13.2
+
+# NLP (Traitement du langage naturel)
+nltk==3.9.4
+
+# Déploiement API (FastAPI)
+fastapi==0.136.0
+uvicorn==0.45.0
+pydantic==2.13.3
