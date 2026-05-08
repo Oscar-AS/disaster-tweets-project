@@ -2,7 +2,7 @@
 
 Ce projet contient une application web simple qui aide a analyser des tweets pour estimer s'ils parlent d'une catastrophe (incendie, inondation, explosion, etc.).
 
-## A quoi sert l'application ? (version non technique)
+## A quoi sert l'application ?
 
 L'application sert a :
 - saisir un tweet manuellement et obtenir un resultat de risque,
@@ -100,11 +100,6 @@ streamlit run app/streamlit_app.py
 - Application : `http://localhost:8501`
 - API distante actuelle (par defaut) : `https://disaster-tweets-project.onrender.com/predict`
 
-## Limitations a connaitre
-
-- Le score est une estimation, pas une verite absolue.
-- Si le service API est en veille, la premiere requete peut prendre du temps.
-- Si le modele distant n'est pas charge, la prediction peut echouer temporairement.
 
 ## Depannage rapide
 
