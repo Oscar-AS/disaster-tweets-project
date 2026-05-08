@@ -274,7 +274,12 @@ def _render_login_screen() -> bool:
 
 def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
     response = requests.post(API_URL, json=payload, timeout=30)
-    response.raise_for_status()
+    if not response.ok:
+        try:
+            detail = response.json().get("detail", response.text)
+        except Exception:
+            detail = response.text
+        raise RuntimeError(f"API HTTP {response.status_code}: {detail}")
     return response.json()
 
 
@@ -431,7 +436,14 @@ def sidebar_controls() -> Dict[str, Any]:
             health_url = f"{normalized_api_url}/health"
         health = requests.get(health_url, timeout=12)
         if health.ok:
-            st.sidebar.success("API connectee")
+            health_payload = health.json()
+            if health_payload.get("model_loaded", True):
+                st.sidebar.success("API connectee")
+            else:
+                st.sidebar.warning("API connectee, modele non charge")
+                model_error = health_payload.get("model_error")
+                if model_error:
+                    st.sidebar.caption(model_error[:240])
         else:
             st.sidebar.warning("API repond avec un statut inattendu")
     except Exception as exc:

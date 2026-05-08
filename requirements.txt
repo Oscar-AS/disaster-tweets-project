@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-mlflow
+mlflow==3.11.1
 dagshub
 pandas
 numpy

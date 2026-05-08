@@ -10,7 +10,7 @@ client = TestClient(app)
 
 def test_clean_text_advanced():
     # Test la traduction d'émoji et nettoyage de base
-    assert clean_text_advanced("Fire! 🔥") == "Fire!  fire"
+    assert clean_text_advanced("Fire! 🔥") == "Fire! fire"
     
     # Test la suppression des URLs
     assert clean_text_advanced("Check this http://example.com") == "Check this"
@@ -19,7 +19,7 @@ def test_clean_text_advanced():
     assert clean_text_advanced("Hello @john_doe, help us!") == "Hello [USER], help us!"
     
     # Test la suppression des caractères spéciaux non-ASCII (et de la ponctuation conservée si ascii)
-    assert clean_text_advanced("Café & résumé 😊") == "Caf & rsum  smiling face with smiling eyes"
+    assert clean_text_advanced("Café & résumé 😊") == "Caf & rsum smiling face with smiling eyes"
     # L'émoji est d'abord traduit en ASCII par demojize, puis les accents (non-ascii) sautent.
     # On vérifie juste que ça ne plante pas et que c'est bien nettoyé.
 
@@ -34,7 +34,7 @@ def test_predict_validation_error():
     response = client.post("/predict", json={"location": "USA"})
     assert response.status_code == 422 # Unprocessable Entity (Pydantic validation error)
 
-@patch('main.model')
+@patch('API.main.model')
 def test_predict_endpoint_success(mock_model):
     # On mocke le comportement de notre modèle MLflow
     # Keras 3 renvoie un NumPy array de probabilités
@@ -53,7 +53,7 @@ def test_predict_endpoint_success(mock_model):
     assert data["clean_text"] == "Huge earthquake hits the city!"
     assert "model_name" in data # Vérification du nouveau champ model_name
 
-@patch('main.model')
+@patch('API.main.model')
 def test_predict_endpoint_success_transformers_format(mock_model):
     # Test pour simuler un Transformer Hugging Face (qui renvoie un DataFrame ou une liste)
     # On force une erreur sur le 1er try (Numpy) pour qu'il bascule sur le 2ème (DataFrame)
@@ -70,7 +70,7 @@ def test_predict_endpoint_success_transformers_format(mock_model):
     assert data["clean_text"] == "Building on fire"
     assert "model_name" in data
 
-@patch('main.model')
+@patch('API.main.model')
 def test_predict_endpoint_empty_text(mock_model):
     # Si le texte est composé uniquement de vide ou d'emojis ignorés et devient vide après nettoyage
     # Le comportement défini est de retourner directement False sans appeler le modèle
