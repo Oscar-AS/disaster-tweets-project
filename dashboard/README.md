@@ -1,134 +1,114 @@
-# Disaster Tweet Detection - MLOps Modular System
+# Application de detection de tweets de catastrophe
 
-Systeme complet de detection de tweets de catastrophe avec:
-- API FastAPI de prediction
-- Dashboard Streamlit connecte a l'API
-- Coeur NLP modulaire (spaCy + modele `.joblib`)
-- Dockerisation des services
+Ce projet contient une application web simple qui aide a analyser des tweets pour estimer s'ils parlent d'une catastrophe (incendie, inondation, explosion, etc.).
 
-## Architecture
+## A quoi sert l'application ? (version non technique)
+
+L'application sert a :
+- saisir un tweet manuellement et obtenir un resultat de risque,
+- envoyer un fichier CSV de plusieurs tweets pour une analyse en lot,
+- afficher un score, un resultat Oui/Non, et des visualisations (graphe + carte),
+- telecharger les resultats en CSV.
+
+En clair : vous donnez du texte, l'application vous aide a prioriser les messages potentiellement urgents.
+
+## Comment ca fonctionne, simplement
+
+1. Vous ouvrez l'application Streamlit dans le navigateur.
+2. Vous vous connectez avec un mot de passe admin.
+3. Vous choisissez :
+   - **Analyse manuelle** (un tweet),
+   - **Analyse par lot CSV** (plusieurs tweets).
+4. Le texte est envoye a une API de prediction.
+5. L'API renvoie :
+   - `is_disaster` : oui/non,
+   - `confidence` ou `score` : niveau de confiance,
+   - parfois des infos complementaires (texte nettoye, nom du modele, etc.).
+6. L'interface affiche le resultat et vous permet d'exporter les donnees.
+
+## Traduction automatique
+
+Si vous saisissez un texte non anglais :
+- l'application detecte la langue,
+- traduit le texte en anglais,
+- affiche la traduction avant prediction,
+- puis envoie cette version traduite au modele.
+
+## Fonctions principales de l'interface
+
+- **Connexion securisee** par mot de passe.
+- **Etat API** dans la barre laterale (connectee ou non).
+- **Bouton "Reveiller l'API maintenant"** pour les services qui se mettent en veille.
+- **Analyse manuelle** avec affichage detaille du resultat.
+- **Analyse CSV** avec :
+  - detection flexible des colonnes texte (`text`, `tweet`, `message`, `content`, `texte`),
+  - bouton de lancement,
+  - tableau de resultats,
+  - bouton de telechargement CSV,
+  - vue "Visualiser en bloc".
+
+## Structure du projet (simplifiee)
 
 ```text
 ML/
-├── api/
-│   └── main.py
 ├── app/
-│   └── streamlit_app.py
+│   └── streamlit_app.py        # application web
+├── src/
+│   ├── bootstrap.py            # aide dependances au demarrage
+│   └── model.py                # logique modele locale (selon usage)
+├── disaster-tweets-project/
+│   └── API/main.py             # API FastAPI de prediction
 ├── docker/
 │   └── start_services.sh
-├── src/
-│   ├── __init__.py
-│   ├── model.py
-│   ├── processor.py
-│   └── schemas.py
 ├── Dockerfile
-├── README.md
-└── requirements.txt
+├── requirements.txt
+└── README.md
 ```
 
-## Fonctionnalites
+## Installation rapide (local)
 
-### API (`api/main.py`)
-- Endpoint `POST /predict`
-- Validation stricte via Pydantic:
-  - texte obligatoire
-  - longueur entre 5 et 280 caracteres
-  - rejet des textes vides apres nettoyage
-- Reponse:
-  - `is_disaster` (bool)
-  - `score` (float)
-  - `impact_words` (dict interpretable type SHAP approx.)
-  - `geo_coords` (liste de coordonnees extraites via NER)
-
-### Dashboard (`app/streamlit_app.py`)
-- Theme sombre
-- Layout large (`wide`)
-- Cartes de metriques stylees (`streamlit-extras`)
-- Simulation de flux live via `st.empty()` + delai de traitement
-- Carte geospatiale (`streamlit-folium`) avec tuiles DarkMatter
-- Graphique Plotly en barres pour la contribution des mots
-- Chaque prediction passe par l'API FastAPI (appel HTTP)
-
-### Coeur ML (`src/`)
-- `processor.py`: nettoyage texte + extraction de lieux via spaCy NER
-- `model.py`: inference via modele `.joblib` + score + impact mots
-
-## Utiliser ton modele `.joblib`
-
-Par defaut, l'application charge le modele depuis:
-- `models/disaster_model.joblib`
-
-Tu peux aussi definir un chemin personnalise avec la variable d'environnement:
-
-```bash
-# Linux/Mac
-export MODEL_PATH="models/mon_modele.joblib"
-
-# Windows PowerShell
-$env:MODEL_PATH="models/mon_modele.joblib"
-```
-
-Interface attendue pour le modele:
-- idealement un pipeline scikit-learn avec `predict_proba`
-- sinon `decision_function` ou `predict`
-
-## Installation locale
-
-1. Creer un environnement virtuel:
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
 ```
 
-2. Installer les dependances:
+Activez l'environnement :
+
+- Windows PowerShell :
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+- Linux / Mac :
+```bash
+source .venv/bin/activate
+```
+
+Installez les dependances :
+
 ```bash
 pip install -r requirements.txt
-python -m spacy download en_core_web_sm
 ```
 
-## Lancement local
+Lancez l'application :
 
-### 1) API
 ```bash
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+streamlit run app/streamlit_app.py
 ```
 
-### 2) Dashboard (dans un 2e terminal)
-```bash
-streamlit run app/streamlit_app.py --server.port 8501
-```
+## URL utiles
 
-Acces:
-- API docs: `http://localhost:8000/docs`
-- Streamlit: `http://localhost:8501`
+- Application : `http://localhost:8501`
+- API distante actuelle (par defaut) : `https://disaster-tweets-project.onrender.com/predict`
 
-## Lancement avec Docker
+## Limitations a connaitre
 
-Construire l'image:
-```bash
-docker build -t disaster-mlops .
-```
+- Le score est une estimation, pas une verite absolue.
+- Si le service API est en veille, la premiere requete peut prendre du temps.
+- Si le modele distant n'est pas charge, la prediction peut echouer temporairement.
 
-Executer le container:
-```bash
-docker run --rm -p 8000:8000 -p 8501:8501 disaster-mlops
-```
+## Depannage rapide
 
-## Exemple payload API
-
-```json
-{
-  "text": "Huge flood in Lagos, rescue teams are trying to evacuate families."
-}
-```
-
-## Notes MLOps
-
-- Separation claire des couches (API / UI / logique ML)
-- Interfaces stables via schemas Pydantic
-- Pret pour extension:
-  - remplacement par un modele fine-tune NLP plus avance si besoin
-  - ajout de tracking MLflow
-  - ajout de tests unitaires/CI
+- **Erreur 503** : utilisez "Reveiller l'API maintenant", puis reessayez.
+- **CSV refuse** : verifiez les noms de colonnes attendus.
+- **Erreur de dependance** : reexecutez `pip install -r requirements.txt`.
 
