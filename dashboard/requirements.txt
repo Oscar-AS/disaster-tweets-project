@@ -11,4 +11,6 @@ streamlit-folium
 spacy
 joblib
 scikit-learn
+deep-translator
+langdetect
 
