@@ -16,10 +16,7 @@ from pydantic import BaseModel
 
 # --- CONFIGURATION ---
 # Ces variables DOIVENT être définies dans Render (Environment Variables)
-HF_API_URL = os.getenv(
-    "HF_API_URL",
-    "https://api-inference.huggingface.co/models/Oscarkaf/disaster-tweets-bert",
-)
+HF_API_URL = os.getenv("HF_API_URL", "")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 
 app = FastAPI(
