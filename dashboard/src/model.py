@@ -31,7 +31,8 @@ class DisasterDetector:
     # Constructeur: prepare le chemin du modele et charge le modele.
     def __init__(self, model_path: str | None = None) -> None:
         # Priorite: parametre passe -> variable d'env MODEL_PATH -> chemin par defaut.
-        self.model_path = model_path or os.getenv("MODEL_PATH", "models/disaster_model.joblib")
+        default_path: str = os.getenv("MODEL_PATH", "models/disaster_model.joblib")
+        self.model_path: str = model_path if model_path is not None else default_path
         # Modele non charge au depart.
         self.model: Any | None = None
         # Modele MLflow pyfunc non charge au depart.

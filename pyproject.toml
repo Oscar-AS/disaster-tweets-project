@@ -1,0 +1,24 @@
+[tool.ruff.lint]
+# Rules to enable
+select = ["E", "F", "W"]
+
+# Rules to ignore globally
+ignore = [
+    "E402", # Module level import not at top of file
+    "E501", # Line too long
+    "W291", # Trailing whitespace
+    "W293", # Blank line contains whitespace
+]
+
+# Specific ignores per file
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = [
+    "F821", # Undefined name
+    "E703", # Useless semicolon
+    "F401", # Unused import
+    "F811", # Redefinition of unused variable
+    "E712", # Comparison to True
+]
+"dashboard/app/streamlit_app.py" = [
+    "E402",
+]

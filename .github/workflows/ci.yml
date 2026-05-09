@@ -33,7 +33,7 @@ jobs:
         # Vérifie si les fonctions reçoivent les bons types de données
         run: |
           pip install mypy
-          mypy src/ --ignore-missing-imports || echo "Mypy a trouvé des soucis de type, à vérifier."
+          mypy dashboard/src/ --ignore-missing-imports || echo "Mypy a trouvé des soucis de type, à vérifier."
 
       - name: Run tests (pytest)
         run: |
