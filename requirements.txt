@@ -11,6 +11,12 @@ scikit-learn==1.8.0
 # Transformers et Hugging Face 
 transformers==5.6.2
 datasets==4.8.4
+torch
+torchvision
+accelerate
+pendulum
+boto3
+optree
 
 # Suivi d'expériences
 mlflow==3.11.1
@@ -23,6 +29,8 @@ seaborn==0.13.2
 # NLP (Traitement du langage naturel)
 nltk==3.9.4
 emoji
+deep-translator
+langdetect
 
 # Déploiement API (FastAPI)
 fastapi==0.136.0

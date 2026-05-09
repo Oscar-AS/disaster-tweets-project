@@ -175,59 +175,108 @@ def clean_text_advanced(text: str) -> str:
     return text.encode("ascii", "ignore").decode("ascii")
 
 
+def get_confidence_single(prediction_item) -> float:
+    """Extracts confidence from a single prediction item (could be dict, list, scalar)."""
+    try:
+        if isinstance(prediction_item, dict):
+            score = float(prediction_item.get("score", 0))
+            label = str(prediction_item.get("label", "")).upper()
+            if "LABEL_0" in label or "NON" in label or "0" == label:
+                return 1.0 - score
+            return score
+        
+        arr = np.array(prediction_item).flatten()
+        if arr.size > 0:
+            # If it's a probability [p0, p1], take p1
+            if arr.size >= 2 and np.all(arr >= 0) and np.all(arr <= 1):
+                return float(arr[1])
+            return float(arr[0])
+        return 0.0
+    except Exception:
+        return 0.0
+
+
 def get_confidence(prediction) -> float:
-    """Extracts scalar confidence from various MLflow return formats."""
+    """Extracts confidence from MLflow return formats (DataFrame, list, array)."""
     if isinstance(prediction, pd.DataFrame):
+        # Case: DataFrame from transformers or sklearn
         if "score" in prediction.columns:
             row = prediction.iloc[0]
-            if "label" in prediction.columns and row["label"] != "LABEL_1":
-                return 1.0 - float(row["score"])
-            return float(row["score"])
-    if isinstance(prediction, list) and prediction and isinstance(prediction[0], dict):
-        res = prediction[0]
-        score = float(res.get("score", 0))
-        if res.get("label") != "LABEL_1":
-            return 1.0 - score
-        return score
-    return float(np.array(prediction).flatten()[0])
+            return get_confidence_single(row.to_dict())
+        # Case: DataFrame with raw probabilities
+        return get_confidence_single(prediction.iloc[0].values)
+    
+    if isinstance(prediction, list):
+        if not prediction: return 0.0
+        return get_confidence_single(prediction[0])
+    
+    return get_confidence_single(prediction)
+
+
+def predict_batch(texts: List[str]) -> List[float]:
+    """Predicts multiple texts at once for speed (used for importance)."""
+    if not texts or model is None:
+        return [0.0] * len(texts)
+    try:
+        # Prioritize batching (fast for BERT/LSTM on GPU/CPU)
+        prediction = model.predict(np.array(texts))
+        if isinstance(prediction, pd.DataFrame):
+            return [get_confidence_single(row.to_dict()) if "score" in prediction.columns 
+                    else get_confidence_single(row.values) 
+                    for _, row in prediction.iterrows()]
+        if isinstance(prediction, (list, np.ndarray)):
+            return [get_confidence_single(p) for p in prediction]
+        return [0.0] * len(texts)
+    except Exception:
+        # Fallback to sequential if the model doesn't like batching
+        return [predict_internal(t) for t in texts]
 
 
 def predict_internal(text: str) -> float:
-    """Fast internal prediction for occlusion-based importance."""
+    """Fast internal prediction for a single text."""
     if not text or model is None:
         return 0.0
     try:
-        # Prioritize Numpy for BERT/Keras speed
+        # Try different formats to accommodate BERT, LSTM, Sklearn, etc.
+        # Format 1: Numpy array (best for BERT/Keras)
         prediction = model.predict(np.array([text]))
         return get_confidence(prediction)
     except Exception:
-        # Fallback to DataFrame for Sklearn/XGBoost
         try:
+            # Format 2: DataFrame (best for Sklearn/XGBoost)
             prediction = model.predict(pd.DataFrame({"text": [text]}))
             return get_confidence(prediction)
         except Exception:
-            return 0.0
+            try:
+                # Format 3: List of strings
+                prediction = model.predict([text])
+                return get_confidence(prediction)
+            except Exception:
+                return 0.0
 
 
 def explain_prediction(text: str, base_confidence: float) -> Dict[str, float]:
-    """Calculates word importance using occlusion (ablation)."""
+    """Calculates word importance using occlusion (ablation) with batch optimization."""
     words = text.split()
     if not words:
         return {}
 
-    # Limit to 15 words for performance
-    words_to_test = words[:15]
+    # Limit to 12 words for optimal speed/accuracy trade-off
+    words_to_test = words[:12]
+    
+    # Generate variations (each variation is the text with one word removed)
+    variations = []
+    for i in range(len(words_to_test)):
+        ablated = " ".join(words_to_test[:i] + words_to_test[i + 1 :])
+        variations.append(ablated if ablated.strip() else "[EMPTY]")
+
+    # Predict all variations in a single batch call (MUCH FASTER than 12 separate calls)
+    ablated_confidences = predict_batch(variations)
+    
     impacts = {}
-
     for i, word in enumerate(words_to_test):
-        # Create text without the current word
-        ablated_text = " ".join(words_to_test[:i] + words_to_test[i + 1 :])
-        if not ablated_text.strip():
-            ablated_text = "[EMPTY]"
-
-        ablated_conf = predict_internal(ablated_text)
-        # Importance = how much confidence dropped when word was removed
-        impacts[word] = round(base_confidence - ablated_conf, 4)
+        conf = ablated_confidences[i] if i < len(ablated_confidences) else base_confidence
+        impacts[word] = round(base_confidence - conf, 4)
 
     return dict(sorted(impacts.items(), key=lambda x: abs(x[1]), reverse=True))
 
