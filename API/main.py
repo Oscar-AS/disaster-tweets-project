@@ -1,7 +1,7 @@
 import builtins
 import re
 from functools import lru_cache
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import dagshub
 import emoji
@@ -184,7 +184,7 @@ def get_confidence_single(prediction_item) -> float:
             if "LABEL_0" in label or "NON" in label or "0" == label:
                 return 1.0 - score
             return score
-        
+
         arr = np.array(prediction_item).flatten()
         if arr.size > 0:
             # If it's a probability [p0, p1], take p1
@@ -205,11 +205,12 @@ def get_confidence(prediction) -> float:
             return get_confidence_single(row.to_dict())
         # Case: DataFrame with raw probabilities
         return get_confidence_single(prediction.iloc[0].values)
-    
+
     if isinstance(prediction, list):
-        if not prediction: return 0.0
+        if not prediction:
+            return 0.0
         return get_confidence_single(prediction[0])
-    
+
     return get_confidence_single(prediction)
 
 
@@ -221,9 +222,12 @@ def predict_batch(texts: List[str]) -> List[float]:
         # Prioritize batching (fast for BERT/LSTM on GPU/CPU)
         prediction = model.predict(np.array(texts))
         if isinstance(prediction, pd.DataFrame):
-            return [get_confidence_single(row.to_dict()) if "score" in prediction.columns 
-                    else get_confidence_single(row.values) 
-                    for _, row in prediction.iterrows()]
+            return [
+                get_confidence_single(row.to_dict())
+                if "score" in prediction.columns
+                else get_confidence_single(row.values)
+                for _, row in prediction.iterrows()
+            ]
         if isinstance(prediction, (list, np.ndarray)):
             return [get_confidence_single(p) for p in prediction]
         return [0.0] * len(texts)
@@ -263,7 +267,7 @@ def explain_prediction(text: str, base_confidence: float) -> Dict[str, float]:
 
     # Limit to 12 words for optimal speed/accuracy trade-off
     words_to_test = words[:12]
-    
+
     # Generate variations (each variation is the text with one word removed)
     variations = []
     for i in range(len(words_to_test)):
@@ -272,10 +276,12 @@ def explain_prediction(text: str, base_confidence: float) -> Dict[str, float]:
 
     # Predict all variations in a single batch call (MUCH FASTER than 12 separate calls)
     ablated_confidences = predict_batch(variations)
-    
+
     impacts = {}
     for i, word in enumerate(words_to_test):
-        conf = ablated_confidences[i] if i < len(ablated_confidences) else base_confidence
+        conf = (
+            ablated_confidences[i] if i < len(ablated_confidences) else base_confidence
+        )
         impacts[word] = round(base_confidence - conf, 4)
 
     return dict(sorted(impacts.items(), key=lambda x: abs(x[1]), reverse=True))
