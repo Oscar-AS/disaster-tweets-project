@@ -1,49 +1,49 @@
 import builtins
+import gc
+import os
 import re
 from functools import lru_cache
 from typing import Dict, List, Optional
 
-import dagshub
 import emoji
-import mlflow.pyfunc
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+# Reduce TF noise
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["AUTOGRAPH_VERBOSITY"] = "0"
 
 # --- CUSTOM METRICS & PATCHES ---
 
 
-@tf.keras.utils.register_keras_serializable(name="f2_score")
-def f2_score(y_true, y_pred):
-    """
-    Custom F2 metric used when the production Keras model was saved.
-    """
-    y_true = tf.cast(y_true, tf.float32)
-    y_pred = tf.cast(y_pred > 0.5, tf.float32)
+@lru_cache(maxsize=1)
+def register_custom_metrics():
+    """Lazy register custom metrics to save memory if TF isn't needed."""
+    try:
+        import tensorflow as tf
+        
+        @tf.keras.utils.register_keras_serializable(name="f2_score")
+        def f2_score(y_true, y_pred):
+            y_true = tf.cast(y_true, tf.float32)
+            y_pred = tf.cast(y_pred > 0.5, tf.float32)
+            true_positives = tf.reduce_sum(y_true * y_pred)
+            false_positives = tf.reduce_sum((1.0 - y_true) * y_pred)
+            false_negatives = tf.reduce_sum(y_true * (1.0 - y_pred))
+            beta_squared = 4.0
+            numerator = (1.0 + beta_squared) * true_positives
+            denominator = numerator + beta_squared * false_negatives + false_positives
+            return tf.math.divide_no_nan(numerator, denominator)
 
-    true_positives = tf.reduce_sum(y_true * y_pred)
-    false_positives = tf.reduce_sum((1.0 - y_true) * y_pred)
-    false_negatives = tf.reduce_sum(y_true * (1.0 - y_pred))
-
-    beta_squared = 4.0
-    numerator = (1.0 + beta_squared) * true_positives
-    denominator = numerator + beta_squared * false_negatives + false_positives
-    return tf.math.divide_no_nan(numerator, denominator)
-
-
-# Ensure the metric is available globally for deserialization
-tf.keras.utils.get_custom_objects()["f2_score"] = f2_score
-builtins.f2_score = f2_score
-
-try:
-    import keras
-
-    keras.saving.register_keras_serializable(name="f2_score")(f2_score)
-    keras.utils.get_custom_objects()["f2_score"] = f2_score
-except Exception:
-    pass
+        tf.keras.utils.get_custom_objects()["f2_score"] = f2_score
+        builtins.f2_score = f2_score
+        
+        import keras
+        keras.saving.register_keras_serializable(name="f2_score")(f2_score)
+        keras.utils.get_custom_objects()["f2_score"] = f2_score
+    except Exception:
+        pass
 
 # PATCH WINDOWS: Force UTF-8 encoding
 _original_open = builtins.open
@@ -108,24 +108,38 @@ model_load_error = None
 
 
 def load_mlflow_model():
-    """Logic to load the model from MLflow registry."""
+    """Logic to load the model from MLflow registry with memory optimization."""
     global model, model_run_name, model_load_error
     try:
+        import dagshub
+        import mlflow.pyfunc
+        
+        # Free memory before loading
+        gc.collect()
+        
+        register_custom_metrics()
+        
         dagshub.init(
             repo_owner="Oscar-AS", repo_name="disaster-tweets-project", mlflow=True
         )
         model_uri = f"models:/{MODEL_NAME}@{ALIAS}"
+        
+        # Load model
         model = mlflow.pyfunc.load_model(model_uri)
 
-        # Get Run Name for display
+        # Get Run Name
         client = mlflow.tracking.MlflowClient()
         run = client.get_run(model.metadata.run_id)
         model_run_name = run.data.tags.get("mlflow.runName", "Modèle sans nom")
         model_load_error = None
+        
+        # Free memory after loading
+        gc.collect()
         print(f"Modèle chargé : {model_run_name}")
     except Exception as e:
         model_load_error = str(e)
         print(f"Erreur chargement modèle : {e}")
+        gc.collect()
 
 
 @app.on_event("startup")
@@ -305,39 +319,62 @@ def health_check():
     }
 
 
+def heuristic_prediction(text: str) -> float:
+    """Lightweight rule-based fallback if ML model is too heavy for RAM."""
+    disaster_terms = {
+        "earthquake", "flood", "wildfire", "fire", "hurricane", "evacuation",
+        "disaster", "collapsed", "injured", "dead", "tsunami", "explosion",
+        "rescue", "storm", "collision", "crash", "emergency", "alert"
+    }
+    words = set(re.findall(r"\w+", text.lower()))
+    matches = words.intersection(disaster_terms)
+    if matches:
+        # Confidence increases with number of matches
+        return min(0.9, 0.4 + (len(matches) * 0.15))
+    return 0.15
+
+
 @app.post("/predict", response_model=PredictionOutput)
 def predict_tweet(tweet: TweetInput):
-    if model is None:
-        raise HTTPException(status_code=503, detail="Modèle non chargé.")
-
     # 1. Translation
     trans_res = translate_text(tweet.text)
     work_text = trans_res["translated_text"]
 
     # 2. Cleaning
     cleaned_text = clean_text_advanced(work_text)
+    
+    # 3. Prediction (ML or Heuristic Fallback)
+    if model is not None:
+        try:
+            confidence = predict_internal(cleaned_text)
+            model_used = model_run_name
+            # 4. Explanation (Word Importance) - Only if ML model
+            impact_words = explain_prediction(cleaned_text, confidence)
+        except Exception:
+            confidence = heuristic_prediction(cleaned_text)
+            model_used = "Heuristic Fallback (ML Error)"
+            impact_words = {}
+    else:
+        confidence = heuristic_prediction(cleaned_text)
+        model_used = f"Heuristic Fallback (Model not loaded: {model_load_error or 'Unknown'})"
+        impact_words = {}
+
     if not cleaned_text:
         return PredictionOutput(
             is_disaster=False,
             confidence=0.0,
             clean_text="",
-            model_name=model_run_name,
+            model_name=model_used,
             impact_words={},
             detected_lang=trans_res["detected_lang"],
             translated_text=work_text,
         )
 
-    # 3. Prediction
-    confidence = predict_internal(cleaned_text)
-
-    # 4. Explanation (Word Importance)
-    impact_words = explain_prediction(cleaned_text, confidence)
-
     return PredictionOutput(
         is_disaster=confidence >= 0.5,
         confidence=confidence,
         clean_text=cleaned_text,
-        model_name=model_run_name,
+        model_name=model_used,
         impact_words=impact_words,
         detected_lang=trans_res["detected_lang"],
         translated_text=work_text,
