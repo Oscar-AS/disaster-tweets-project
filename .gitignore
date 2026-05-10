@@ -70,3 +70,8 @@ Thumbs.db
 *.app
 rad.json
 TestResults.xml
+
+# Secrets / Environment Variables (NE JAMAIS COMMITTER)
+.env
+.env.*
+!.env.example

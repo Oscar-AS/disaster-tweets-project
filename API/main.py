@@ -9,14 +9,34 @@ import re
 from functools import lru_cache
 from typing import Dict, List, Optional
 
+import json
+import urllib.error
+import urllib.request
+
 import emoji
-import requests
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 # --- CONFIGURATION ---
+# Charge le fichier .env si présent (développement local)
+# On cherche le .env dans le même dossier que ce fichier main.py
+# pour que ça fonctionne peu importe depuis où uvicorn est lancé.
+try:
+    from pathlib import Path
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).parent / ".env"
+    load_dotenv(dotenv_path=_env_path)
+except ImportError:
+    pass  # python-dotenv non installé, on utilise les vars d'env système
+
 # Ces variables DOIVENT être définies dans Render (Environment Variables)
-HF_API_URL = os.getenv("HF_API_URL", "")
+# ou dans le fichier .env pour le développement local
+HF_API_URL = os.getenv(
+    "HF_API_URL",
+    "https://api-inference.huggingface.co/models/Oscarkaf/disaster-tweets-bert"
+)
+HF_MODEL_ID = os.getenv("HF_MODEL_ID", HF_API_URL.rstrip("/").split("/models/")[-1])
+HF_PROVIDER = os.getenv("HF_PROVIDER", "hf-inference")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 
 app = FastAPI(
@@ -24,6 +44,28 @@ app = FastAPI(
     description="API ultra-légère utilisant Hugging Face Inference API.",
     version="2.0.0",
 )
+
+# --- HF MODEL ID NORMALIZATION ---
+def normalize_hf_model_id(value: str) -> str:
+    """
+    Rend l'identifiant compatible `InferenceClient`.
+    Accepte soit:
+    - "owner/repo"
+    - "https://api-inference.huggingface.co/models/owner/repo"
+    """
+    v = (value or "").strip()
+    if not v:
+        return v
+    marker = "/models/"
+    if marker in v:
+        v = v.split(marker, 1)[-1].strip().strip("/")
+    return v
+
+
+HF_MODEL_ID = normalize_hf_model_id(HF_MODEL_ID)
+
+# On garde l'URL HF explicite (utile en fallback direct HTTP).
+HF_API_URL = (HF_API_URL or "").strip()
 
 # --- TRANSLATION UTILS (LRU CACHE) ---
 try:
@@ -90,74 +132,93 @@ class PredictionOutput(BaseModel):
 
 def query_huggingface(text: str) -> tuple:
     """Appelle l'API Hugging Face Inference pour obtenir une prédiction."""
-    if not HF_TOKEN:
-        return None, "HF_TOKEN manquant dans les variables d'environnement Render."
+    if not HF_MODEL_ID:
+        return None, "HF_MODEL_ID manquant ou invalide."
+    if not HF_API_URL:
+        return None, "HF_API_URL manquant ou invalide."
 
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": text, "options": {"wait_for_model": True}}
-
+    # Appel direct HTTP pour éviter toute ambiguïté de construction d'URL.
+    # Hugging Face Inference API: POST { "inputs": "<text>" } sur /models/<repo_id>
     try:
-        response = requests.post(
-            HF_API_URL, headers=headers, json=payload, timeout=30
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        # Si le modèle est privé, HF_TOKEN est requis. Si public, on peut appeler sans.
+        if HF_TOKEN:
+            headers["Authorization"] = f"Bearer {HF_TOKEN}"
+        req = urllib.request.Request(
+            HF_API_URL,
+            data=json.dumps({"inputs": text}).encode("utf-8"),
+            headers=headers,
+            method="POST",
         )
-        if response.status_code == 200:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                preds = result[0] if isinstance(result[0], list) else result
-                # Cherche le label positif (catastrophe)
-                for pred in preds:
-                    label = str(pred.get("label", "")).upper()
-                    if label in ["LABEL_1", "POSITIVE", "DISASTER", "1"]:
-                        return float(pred["score"]), None
-                # Si le label 0 est trouvé en premier, inverser le score
-                for pred in preds:
-                    label = str(pred.get("label", "")).upper()
-                    if label in ["LABEL_0", "NEGATIVE", "NOT_DISASTER", "0"]:
-                        return 1.0 - float(pred["score"]), None
-                # Fallback : retourne le premier score
-                return float(preds[0]["score"]), None
-        return None, f"Erreur HF {response.status_code}: {response.text[:200]}"
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+        payload = json.loads(body) if body else None
+
+        # Erreurs HF possibles: {"error": "..."} ou {"estimated_time": ...}
+        if isinstance(payload, dict) and payload.get("error"):
+            return None, str(payload.get("error"))
+
+        # text-classification renvoie souvent: [{"label": "...", "score": ...}, ...]
+        if payload:
+            return extract_disaster_confidence(payload), None
+    except urllib.error.HTTPError as exc:
+        # Lire corps d'erreur pour message utile (401/403/404/503 etc.)
+        try:
+            err_body = exc.read().decode("utf-8", errors="replace")
+            return None, f"{exc.code} {exc.reason}: {err_body[:400]}"
+        except Exception:
+            return None, f"{exc.code} {exc.reason}"
     except Exception as exc:
         return None, str(exc)
+
+    return None, "Réponse Hugging Face vide."
+
+
+def get_prediction_value(pred, key: str):
+    """Lit une prédiction HF, que ce soit un dict ou un objet dataclass."""
+    if isinstance(pred, dict):
+        return pred.get(key)
+    return getattr(pred, key, None)
+
+
+def extract_disaster_confidence(preds) -> float:
+    """Extrait la probabilité catastrophe depuis les labels Hugging Face."""
+    positive_labels = {"LABEL_1", "POSITIVE", "DISASTER", "1"}
+    negative_labels = {"LABEL_0", "NEGATIVE", "NOT_DISASTER", "0"}
+
+    for pred in preds:
+        label = str(get_prediction_value(pred, "label") or "").upper()
+        if label in positive_labels:
+            return float(get_prediction_value(pred, "score"))
+
+    for pred in preds:
+        label = str(get_prediction_value(pred, "label") or "").upper()
+        if label in negative_labels:
+            return 1.0 - float(get_prediction_value(pred, "score"))
+
+    return float(get_prediction_value(preds[0], "score"))
 
 
 def query_huggingface_batch(texts: List[str]) -> List[float]:
     """Appelle HF en batch pour plusieurs textes (utilisé pour l'explicabilité)."""
     if not HF_TOKEN or not texts:
         return [0.0] * len(texts)
+    if not HF_MODEL_ID:
+        return [0.0] * len(texts)
+    if not HF_API_URL:
+        return [0.0] * len(texts)
 
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": texts, "options": {"wait_for_model": True}}
-
-    try:
-        response = requests.post(
-            HF_API_URL, headers=headers, json=payload, timeout=60
-        )
-        if response.status_code == 200:
-            results = response.json()
-            confidences = []
-            for result in results:
-                preds = result if isinstance(result, list) else [result]
-                conf = 0.0
-                for pred in preds:
-                    label = str(pred.get("label", "")).upper()
-                    if label in ["LABEL_1", "POSITIVE", "DISASTER", "1"]:
-                        conf = float(pred["score"])
-                        break
-                    if label in ["LABEL_0", "NEGATIVE", "NOT_DISASTER", "0"]:
-                        conf = 1.0 - float(pred["score"])
-                        break
-                confidences.append(conf)
-            return confidences
-    except Exception:
-        pass
-
-    # Fallback : appels séquentiels si le batch échoue
-    results = []
+    results: List[float] = []
     for text in texts:
         conf, err = query_huggingface(text)
-        results.append(conf if conf is not None else 0.0)
+        results.append(conf if conf is not None and err is None else 0.0)
     return results
+
+    # Fallback : appels séquentiels si le batch échoue
+    # (déjà couvert par l'implémentation ci-dessus)
 
 
 def heuristic_prediction(text: str) -> float:
@@ -229,12 +290,20 @@ def home():
 @app.get("/health")
 def health():
     """Vérifie que l'API est en ligne."""
+    try:
+        import huggingface_hub  # type: ignore
+        hub_version = getattr(huggingface_hub, "__version__", None)
+    except Exception:
+        hub_version = None
     return {
         "status": "ok",
         "mode": "huggingface_inference",
         "model_loaded": True,
         "model_name": "BERTweet (via Hugging Face API)",
         "model_error": None,
+        "hf_model_id": HF_MODEL_ID,
+        "hf_api_url": HF_API_URL,
+        "huggingface_hub_version": hub_version,
     }
 
 

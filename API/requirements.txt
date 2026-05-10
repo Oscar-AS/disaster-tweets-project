@@ -1,7 +1,9 @@
-fastapi==0.136.0
-uvicorn==0.45.0
-requests==2.33.1
-pydantic==2.13.3
+fastapi
+uvicorn[standard]
+pydantic
+huggingface_hub
+python-dotenv
 deep-translator
 langdetect
 emoji
+httpx

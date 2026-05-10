@@ -1,54 +1,51 @@
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
+
 from API.main import app, clean_text_advanced
 
-# import pytest
-from unittest.mock import patch
-import pandas as pd
-import numpy as np
 
-# On crée le client de test
 client = TestClient(app)
 
 
 def test_clean_text_advanced():
-    # Test la traduction d'émoji et nettoyage de base
     assert clean_text_advanced("Fire! 🔥") == "Fire! fire"
-
-    # Test la suppression des URLs
     assert clean_text_advanced("Check this http://example.com") == "Check this"
-
-    # Test la conversion des mentions
     assert clean_text_advanced("Hello @john_doe, help us!") == "Hello [USER], help us!"
-
-    # Test la suppression des caractères spéciaux non-ASCII (et de la ponctuation conservée si ascii)
     assert (
         clean_text_advanced("Café & résumé 😊")
         == "Caf & rsum smiling face with smiling eyes"
     )
-    # L'émoji est d'abord traduit en ASCII par demojize, puis les accents (non-ascii) sautent.
-    # On vérifie juste que ça ne plante pas et que c'est bien nettoyé.
 
 
 def test_health_check():
     response = client.get("/health")
+
     assert response.status_code == 200
-    assert "status" in response.json()
-    assert response.json()["status"] == "ok"
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["mode"] == "huggingface_inference"
+    assert data["model_loaded"] is True
+
+
+def test_home():
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "message" in response.json()
 
 
 def test_predict_validation_error():
-    # Si on envoie un JSON vide (sans le champ requis 'text')
     response = client.post("/predict", json={"location": "USA"})
-    assert (
-        response.status_code == 422
-    )  # Unprocessable Entity (Pydantic validation error)
+
+    assert response.status_code == 422
 
 
-@patch("API.main.model")
-def test_predict_endpoint_success(mock_model):
-    # On mocke le comportement de notre modèle MLflow
-    # Keras 3 renvoie un NumPy array de probabilités
-    mock_model.predict.return_value = np.array([[0.85]])
+@patch("API.main.query_huggingface_batch")
+@patch("API.main.query_huggingface")
+def test_predict_success_disaster(mock_hf, mock_hf_batch):
+    mock_hf.return_value = (0.92, None)
+    mock_hf_batch.return_value = [0.5, 0.7, 0.8, 0.9, 0.85]
 
     response = client.post(
         "/predict",
@@ -62,39 +59,43 @@ def test_predict_endpoint_success(mock_model):
     assert response.status_code == 200
     data = response.json()
     assert data["is_disaster"] is True
-    assert data["confidence"] == 0.85
+    assert data["confidence"] == 0.92
     assert data["clean_text"] == "Huge earthquake hits the city!"
-    assert "model_name" in data  # Vérification du nouveau champ model_name
+    assert "BERTweet" in data["model_name"]
+    assert data["impact_words"]
 
 
-@patch("API.main.model")
-def test_predict_endpoint_success_transformers_format(mock_model):
-    # Test pour simuler un Transformer Hugging Face (qui renvoie un DataFrame ou une liste)
-    # On force une erreur sur le 1er try (Numpy) pour qu'il bascule sur le 2ème (DataFrame)
-    mock_model.predict.side_effect = [
-        Exception("Numpy not supported"),
-        pd.DataFrame([{"label": "LABEL_1", "score": 0.95}]),
-    ]
+@patch("API.main.query_huggingface_batch")
+@patch("API.main.query_huggingface")
+def test_predict_success_not_disaster(mock_hf, mock_hf_batch):
+    mock_hf.return_value = (0.12, None)
+    mock_hf_batch.return_value = [0.1, 0.08, 0.09, 0.11]
 
-    response = client.post("/predict", json={"text": "Building on fire"})
+    response = client.post("/predict", json={"text": "What a beautiful day!"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_disaster"] is False
+    assert data["confidence"] == 0.12
+
+
+@patch("API.main.query_huggingface")
+def test_predict_hf_error_fallback(mock_hf):
+    mock_hf.return_value = (None, "Connection timeout")
+
+    response = client.post("/predict", json={"text": "Massive earthquake and flood!"})
 
     assert response.status_code == 200
     data = response.json()
     assert data["is_disaster"] is True
-    assert data["confidence"] == 0.95
-    assert data["clean_text"] == "Building on fire"
-    assert "model_name" in data
+    assert "Heuristic Fallback" in data["model_name"]
 
 
-@patch("API.main.model")
-def test_predict_endpoint_empty_text(mock_model):
-    # Si le texte est composé uniquement de vide ou d'emojis ignorés et devient vide après nettoyage
-    # Le comportement défini est de retourner directement False sans appeler le modèle
+def test_predict_empty_text():
     response = client.post("/predict", json={"text": "   "})
+
     assert response.status_code == 200
     data = response.json()
     assert data["is_disaster"] is False
     assert data["confidence"] == 0.0
     assert data["clean_text"] == ""
-    # On vérifie que le modèle n'a pas été appelé
-    mock_model.predict.assert_not_called()
