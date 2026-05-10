@@ -61,7 +61,7 @@ ensure_packages(
 )
 
 # Adresse par défaut du service de prédiction (modifiable dans la barre latérale)
-API_URL = os.getenv("API_URL", "https://oscarkaf-disaster-tweets-project.hf.space/predict")
+API_URL = os.getenv("API_URL", "https://oscarkaf-disaster-tweets-api.hf.space/predict")
 # Trois mots de passe acceptés ; on peut les remplacer par des variables d'environnement
 ADMIN_PASSWORDS = {
     os.getenv("ADMIN_PASSWORD_1", "ADMIN1"),
