@@ -14,7 +14,7 @@ def test_clean_text_advanced():
     assert clean_text_advanced("Hello @john_doe, help us!") == "Hello [USER], help us!"
     assert (
         clean_text_advanced("Café & résumé 😊")
-        == "Caf & rsum smiling face with smiling eyes"
+        == "Café & résumé smiling face with smiling eyes"
     )
 
 
