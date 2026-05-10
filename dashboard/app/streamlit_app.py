@@ -61,7 +61,7 @@ ensure_packages(
 )
 
 # Adresse par défaut du service de prédiction (modifiable dans la barre latérale)
-API_URL = "https://disaster-tweets-project.onrender.com/predict"
+API_URL = os.getenv("API_URL", "https://oscarkaf-disaster-tweets-project.hf.space/predict")
 # Trois mots de passe acceptés ; on peut les remplacer par des variables d'environnement
 ADMIN_PASSWORDS = {
     os.getenv("ADMIN_PASSWORD_1", "ADMIN1"),
@@ -442,10 +442,8 @@ def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
             body = health.json()
             if "predict_ready" in body and body.get("predict_ready") is False:
                 raise RuntimeError(
-                    "Côté serveur, aucune prédiction n'est autorisée pour l'instant : le modèle MLflow "
-                    "n'est pas chargé et le repli heuristique est désactivé (ALLOW_HEURISTIC_FALLBACK). "
-                    "Sur Render : mettez ALLOW_HEURISTIC_FALLBACK=true ou configurez DAGSHUB_USER_TOKEN "
-                    "+ MLFLOW_TRACKING_USERNAME, puis redéployez. "
+                    "Côté serveur, aucune prédiction n'est autorisée pour l'instant. "
+                    "Vérifiez que le modèle est bien chargé sur votre Hugging Face Space. "
                     f"Réponse /health : {body}"
                 )
     except RuntimeError:
@@ -472,7 +470,7 @@ def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
                 raise RuntimeError(
                     "Erreur serveur 503 — "
                     + _api_error_detail(response)
-                    + " Si le texte indique MLflow ou le modèle, corrigez le déploiement Render ; sinon réessayez après le cold start."
+                    + " Le Hugging Face Space est peut-être en train de démarrer (cold start), réessayez dans un instant."
                 )
             detail = _api_error_detail(response)
             raise RuntimeError(f"Erreur API {response.status_code}: {detail}")
@@ -487,7 +485,7 @@ def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
             raise RuntimeError(
                 "Erreur serveur 503 après plusieurs tentatives — "
                 + _api_error_detail(last_response)
-                + " Utilisez « Réveiller l'API » puis réessayez, ou vérifiez que le modèle est bien chargé côté Render."
+                + " Utilisez « Réveiller l'API » puis réessayez, ou vérifiez que le modèle est bien chargé côté Hugging Face."
             )
         if not last_response.ok:
             raise RuntimeError(
@@ -1040,22 +1038,8 @@ def sidebar_controls() -> Dict[str, Any]:
     section_title("icon-config", "Configuration", sidebar=True)
     api_url = st.sidebar.text_input("URL API", value=API_URL, key="sidebar_api_url")
 
-    # AJOUT: Bouton Refresh pour MLflow
-    if st.sidebar.button(
-        "🔄 Rafraîchir le modèle MLflow", width="stretch", key="sidebar_refresh_model"
-    ):
-        try:
-            refresh_url = f"{api_url.rstrip('/')}/refresh"
-            if refresh_url.endswith(
-                "/predict/refresh"
-            ):  # Fix if url already had /predict
-                refresh_url = refresh_url.replace("/predict/refresh", "/refresh")
-            res = requests.post(refresh_url, timeout=180).json()
-            st.sidebar.success(f"Modèle rechargé : {res.get('model_name')}")
-            time.sleep(1)
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"Erreur refresh : {e}")
+    # Le bouton de rafraîchissement MLflow a été retiré car le modèle
+    # est désormais chargé en dur via Hugging Face Transformers.
 
     max_batch_rows = st.sidebar.number_input(
         "Lignes max (analyse par lot CSV)",
@@ -1071,7 +1055,7 @@ def sidebar_controls() -> Dict[str, Any]:
         "Réveiller l'API maintenant",
         width="stretch",
         key="sidebar_warmup_api",
-        help="Force plusieurs appels à /health pour réveiller le service (ex. Render en veille). Peut prendre 1 à 2 minutes.",
+        help="Force plusieurs appels à /health pour réveiller le service (ex. Hugging Face Space en veille). Peut prendre 1 à 2 minutes.",
     ):
         warm_box = st.sidebar.empty()
         warm_box.info(
@@ -1091,11 +1075,11 @@ def sidebar_controls() -> Dict[str, Any]:
                         hf = data.get("heuristic_fallback_active")
                         bits = []
                         if ml is not None:
-                            bits.append(f"MLflow chargé : {'oui' if ml else 'non'}")
+                            bits.append(f"Modèle chargé : {'oui' if ml else 'non'}")
                         if hf:
                             bits.append("repli heuristique actif")
                         if data.get("model_load_error") and not ml:
-                            bits.append("voir logs modèle (model_load_error)")
+                            bits.append(f"Erreur: {data.get('model_load_error')}")
                         model_loaded_msg = (" " + " · ".join(bits)) if bits else ""
                     except Exception:
                         model_loaded_msg = ""
