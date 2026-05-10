@@ -24,7 +24,7 @@ This Space runs a FastAPI server that:
 
 ### Environment variables (Space Settings → Variables/Secrets)
 
-- `HF_API_URL` (optional if you set `HF_MODEL_ID`): example `https://api-inference.huggingface.co/models/Oscarkaf/disaster-tweets-bert`
+- `HF_API_URL` (optional if you set `HF_MODEL_ID`): example `https://router.huggingface.co/hf-inference/models/Oscarkaf/disaster-tweets-bert`
 - `HF_MODEL_ID` (optional if `HF_API_URL` already contains `/models/...`): example `Oscarkaf/disaster-tweets-bert`
 - `HF_TOKEN` (**Secret**, only needed if model is private)
 

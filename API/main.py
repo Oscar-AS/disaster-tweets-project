@@ -33,7 +33,8 @@ except ImportError:
 # ou dans le fichier .env pour le développement local
 HF_API_URL = os.getenv(
     "HF_API_URL",
-    "https://api-inference.huggingface.co/models/Oscarkaf/disaster-tweets-bert"
+    # Legacy endpoint was decommissioned; router is the current default.
+    "https://router.huggingface.co/hf-inference/models/Oscarkaf/disaster-tweets-bert"
 )
 HF_MODEL_ID = os.getenv("HF_MODEL_ID", HF_API_URL.rstrip("/").split("/models/")[-1])
 HF_PROVIDER = os.getenv("HF_PROVIDER", "hf-inference")
@@ -64,8 +65,25 @@ def normalize_hf_model_id(value: str) -> str:
 
 HF_MODEL_ID = normalize_hf_model_id(HF_MODEL_ID)
 
+def normalize_hf_api_url(value: str) -> str:
+    """
+    Normalise l'URL d'inférence Hugging Face.
+
+    - Ancien (désactivé): https://api-inference.huggingface.co/models/<repo_id>
+    - Nouveau:           https://router.huggingface.co/hf-inference/models/<repo_id>
+    """
+    v = (value or "").strip()
+    if not v:
+        return v
+    legacy_prefix = "https://api-inference.huggingface.co/models/"
+    new_prefix = "https://router.huggingface.co/hf-inference/models/"
+    if v.startswith(legacy_prefix):
+        v = new_prefix + v[len(legacy_prefix) :]
+    return v
+
+
 # On garde l'URL HF explicite (utile en fallback direct HTTP).
-HF_API_URL = (HF_API_URL or "").strip()
+HF_API_URL = normalize_hf_api_url(HF_API_URL)
 
 # --- TRANSLATION UTILS (LRU CACHE) ---
 try:
