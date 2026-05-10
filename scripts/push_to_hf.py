@@ -3,10 +3,7 @@ Script pour exporter le meilleur modèle de MLflow vers Hugging Face Hub.
 Usage: python scripts/push_to_hf.py
 """
 import os
-import mlflow
-import dagshub
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from huggingface_hub import login, HfApi
 
 # --- CONFIGURATION ---
 LOCAL_MODEL_PATH = "model_avancé/best_model_BERTweet"

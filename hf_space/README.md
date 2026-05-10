@@ -1,6 +1,6 @@
 ---
 title: Disaster Tweets API
-emoji: ""
+emoji: "🔥"
 colorFrom: blue
 colorTo: indigo
 sdk: docker
