@@ -7,3 +7,5 @@ deep-translator
 langdetect
 emoji
 httpx
+torch
+transformers
