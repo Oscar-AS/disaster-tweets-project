@@ -52,9 +52,15 @@ def get_classifier():
         return None
 
     try:
-        # On charge le modèle depuis le Hub Hugging Face (il sera mis en cache localement)
-        print(f"Loading model {HF_MODEL_ID} locally...")
-        _classifier_pipeline = pipeline("text-classification", model=HF_MODEL_ID)
+        from transformers import AutoTokenizer
+        # Le tokenizer sauvegardé avec le modèle peut être corrompu ou mal configuré.
+        # On force l'utilisation du tokenizer officiel de BERTweet avec la normalisation activée.
+        print(f"Loading official tokenizer: vinai/bertweet-base...")
+        tokenizer = AutoTokenizer.from_pretrained("vinai/bertweet-base", normalization=True)
+        
+        # On charge VOTRE modèle (cerveau) mais avec le TOKENIZER officiel (lunettes)
+        print(f"Loading your model {HF_MODEL_ID} locally...")
+        _classifier_pipeline = pipeline("text-classification", model=HF_MODEL_ID, tokenizer=tokenizer)
         return _classifier_pipeline
     except Exception as e:
         _model_load_error = str(e)
