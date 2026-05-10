@@ -1,0 +1,33 @@
+name: Sync API Space to Hugging Face
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assemble Space package (Docker + API only)
+        run: |
+          rm -rf hf_space_build
+          mkdir -p hf_space_build
+
+          # Space root files
+          cp hf_space/Dockerfile hf_space_build/Dockerfile
+          cp hf_space/README.md hf_space_build/README.md
+          cp hf_space/.dockerignore hf_space_build/.dockerignore
+
+          # API source (kept as /API in the Space repo)
+          cp -r API hf_space_build/API
+
+      - name: Sync to Hugging Face Space
+        uses: huggingface/hub-sync@v0.1.0
+        with:
+          repo_type: space
+          huggingface_repo_id: Oscarkaf/disaster-tweets-api
+          hf_token: ${{ secrets.HF_TOKEN }}
+          subdirectory: hf_space_build
