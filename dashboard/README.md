@@ -34,6 +34,78 @@ Si vous saisissez un texte non anglais :
 - affiche la traduction avant prediction,
 - puis envoie cette version traduite au modele.
 
+## Detail des 2 packages de traduction
+
+Cette section explique les 2 bibliotheques utilisees dans ce projet :
+- `langdetect` (detecter la langue),
+- `deep-translator` (traduire le texte).
+
+### 1) Package `langdetect`
+
+**Role simple**
+- Deviner automatiquement la langue d'un texte (fr, en, es, etc.).
+
+**Fonctions utilisees dans le projet**
+- `detect(text: str) -> str`
+  - Retourne le code langue le plus probable (`"fr"`, `"en"`, ...).
+  - Utilisee avant la traduction pour savoir s'il faut traduire.
+- `LangDetectException`
+  - Exception levee quand le texte est trop court, vide ou ambigu.
+  - Capturee pour eviter de bloquer l'application.
+
+**Fonctions importantes (API du package)**
+- `detect_langs(text: str) -> list`
+  - Retourne plusieurs langues avec probabilites.
+  - Exemple de sortie : `[fr:0.92, en:0.08]`.
+
+### 2) Package `deep-translator`
+
+**Role simple**
+- Traduire du texte d'une langue source vers une langue cible.
+
+**Classe/fonctions utilisees dans le projet**
+- `GoogleTranslator(source=..., target=...)`
+  - Cree un traducteur (ex: source `fr`, cible `en`).
+- `GoogleTranslator(...).translate(text: str) -> str`
+  - Traduit un seul texte.
+  - C'est la fonction centrale utilisee pour la prediction.
+
+**Fonctions utiles du package**
+- `GoogleTranslator(...).translate_batch(list_of_texts: list[str]) -> list[str]`
+  - Traduit plusieurs textes d'un coup.
+- `GoogleTranslator.get_supported_languages(as_dict=False)`
+  - Retourne les langues supportees.
+
+### Mecanisme complet (etape par etape)
+
+1. L'utilisateur saisit un texte (par ex. francais).
+2. L'app verifie si le texte est assez long pour une detection fiable (`TRANSLATE_MIN_CHARS`).
+3. `langdetect.detect(text)` identifie la langue.
+4. Si la langue est deja anglaise (`en`), on garde le texte original.
+5. Sinon, `deep-translator` traduit vers l'anglais.
+6. L'app affiche la traduction (transparence utilisateur).
+7. La prediction est faite sur le texte traduit.
+8. Le resultat (Oui/Non + score) est affiche dans le dashboard.
+
+### Gestion des erreurs (important)
+
+- Si la detection echoue (`LangDetectException`) : on garde le texte original.
+- Si la traduction echoue (reseau/API externe) : on garde le texte original.
+- Si l'utilisateur desactive la traduction (`DISABLE_AUTO_TRANSLATION=true`) : aucune traduction n'est tentee.
+
+### Variables de configuration liees a la traduction
+
+- `DISABLE_AUTO_TRANSLATION`
+  - `true/1/yes` : desactive la traduction automatique.
+- `TRANSLATE_MIN_CHARS`
+  - longueur minimale du texte pour tenter detection + traduction (ex: `8`).
+
+### Pourquoi ce design est adapte a un non technicien
+
+- On evite les blocages : en cas d'echec traduction, l'app continue.
+- On garde la transparence : la phrase traduite est visible avant prediction.
+- On garde la simplicite : 2 outils specialises, chacun pour une seule tache.
+
 ## Fonctions principales de l'interface
 
 - **Connexion securisee** par mot de passe.

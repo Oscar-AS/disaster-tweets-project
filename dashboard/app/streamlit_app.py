@@ -63,7 +63,7 @@ from streamlit_extras.metric_cards import style_metric_cards  # Mise en forme de
 from streamlit_folium import st_folium  # Affichage de la carte Folium dans Streamlit
 
 # Adresse par défaut du service de prédiction (modifiable dans la barre latérale)
-API_URL = "https://disaster-tweets-project.onrender.com/predict"
+API_URL = os.getenv("API_URL", "https://oscarkaf-disaster-tweets-api.hf.space/predict")
 # Trois mots de passe acceptés ; on peut les remplacer par des variables d'environnement
 ADMIN_PASSWORDS = {
     os.getenv("ADMIN_PASSWORD_1", "ADMIN1"),
@@ -115,72 +115,72 @@ def setup_page() -> None:
         """
         <style>
             .stApp {
-                background: radial-gradient(circle at 15% 20%, #dbeafe 0%, transparent 30%),
-                            radial-gradient(circle at 80% 0%, #cffafe 0%, transparent 35%),
-                            #f8fafc;
+                background: radial-gradient(circle at 15% 20%, rgba(29, 155, 240, 0.10) 0%, transparent 30%),
+                            radial-gradient(circle at 80% 0%, rgba(15, 20, 25, 0.08) 0%, transparent 35%),
+                            #f7f9f9;
             }
             .block-container { padding-top: 1.4rem; }
-            .hero { background: linear-gradient(115deg,#312e81 0%,#4f46e5 45%,#0891b2 100%); color:#f8fafc; border-radius:16px; padding:1.1rem 1.2rem; margin-bottom:.9rem; text-align:center; }
-            .card { background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:.9rem 1rem; box-shadow:0 4px 16px rgba(15,23,42,.06); }
-            .title-row { display:flex; align-items:center; gap:.55rem; margin:.2rem 0 .7rem 0; color:#0f172a; font-weight:700; font-size:1.05rem; }
+            .hero { background: linear-gradient(115deg,#0f1419 0%,#15202b 50%,#1d9bf0 100%); color:#f7f9f9; border-radius:16px; padding:1.1rem 1.2rem; margin-bottom:.9rem; text-align:center; }
+            .card { background:#ffffff; border:1px solid #e1e8ed; border-radius:14px; padding:.9rem 1rem; box-shadow:0 6px 20px rgba(15,20,25,.08); }
+            .title-row { display:flex; align-items:center; gap:.55rem; margin:.2rem 0 .7rem 0; color:#0f1419; font-weight:700; font-size:1.05rem; }
             .icon { width:26px; height:26px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700; }
-            .icon-alert { background:linear-gradient(135deg,#2563eb,#06b6d4); } .icon-live { background:linear-gradient(135deg,#1d4ed8,#0ea5e9); }
-            .icon-kpi { background:linear-gradient(135deg,#0ea5e9,#3b82f6); } .icon-config { background:linear-gradient(135deg,#4f46e5,#7c3aed); }
-            .icon-health { background:linear-gradient(135deg,#059669,#10b981); } .icon-alert::before{content:"!";} .icon-live::before{content:">";}
+            .icon-alert { background:linear-gradient(135deg,#0f1419,#1d9bf0); } .icon-live { background:linear-gradient(135deg,#15202b,#1d9bf0); }
+            .icon-kpi { background:linear-gradient(135deg,#1d9bf0,#0f1419); } .icon-config { background:linear-gradient(135deg,#0f1419,#536471); }
+            .icon-health { background:linear-gradient(135deg,#1d9bf0,#536471); } .icon-alert::before{content:"!";} .icon-live::before{content:">";}
             .icon-kpi::before{content:"o";} .icon-config::before{content:"=";} .icon-health::before{content:"+";}
             .strong-box-title {
-                border: 2px solid #93c5fd;
+                border: 2px solid #1d9bf0;
                 border-radius: 10px;
                 padding: 0.45rem 0.7rem;
                 font-size: 1.05rem;
                 font-weight: 800;
                 margin-bottom: 0.45rem;
-                color: #1e3a8a;
-                background: #eff6ff;
+                color: #0f1419;
+                background: #eef8ff;
             }
             .section-box-title {
-                border: 2px solid #60a5fa;
+                border: 2px solid #1d9bf0;
                 border-radius: 12px;
                 padding: 0.5rem 0.8rem;
                 font-size: 1.15rem;
                 font-weight: 900;
-                color: #1e40af;
-                background: #eff6ff;
+                color: #0f1419;
+                background: #eef8ff;
                 margin: 0.35rem 0 0.7rem 0;
             }
             .input-box-title {
-                border: 2px solid #93c5fd;
+                border: 2px solid #1d9bf0;
                 border-radius: 10px;
                 padding: 0.4rem 0.65rem;
                 font-size: 1.0rem;
                 font-weight: 800;
-                color: #1e3a8a;
-                background: #eff6ff;
+                color: #0f1419;
+                background: #eef8ff;
                 margin: 0.2rem 0 0.45rem 0;
             }
             .csv-help-card {
-                border: 1px solid #bfdbfe;
-                background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+                border: 1px solid #cfd9de;
+                background: linear-gradient(180deg, #ffffff 0%, #f2f8fc 100%);
                 border-radius: 14px;
                 padding: 0.75rem 0.9rem;
                 margin: 0.25rem 0 0.75rem 0;
-                box-shadow: 0 6px 18px rgba(37, 99, 235, 0.08);
+                box-shadow: 0 6px 18px rgba(29, 155, 240, 0.10);
             }
             .csv-help-title {
                 font-size: 1rem;
                 font-weight: 900;
-                color: #1e3a8a;
+                color: #0f1419;
                 margin-bottom: 0.35rem;
             }
             .csv-help-line {
                 font-size: 0.95rem;
-                color: #1f2937;
+                color: #0f1419;
                 margin: 0.2rem 0;
                 line-height: 1.35;
             }
             .csv-help-line code {
-                background: #dbeafe;
-                color: #1e3a8a;
+                background: #e8f5fe;
+                color: #0f1419;
                 border-radius: 6px;
                 padding: 0.08rem 0.32rem;
                 font-weight: 700;
@@ -188,44 +188,345 @@ def setup_page() -> None:
             .csv-uploader-title {
                 font-size: 1rem;
                 font-weight: 900;
-                color: #1e3a8a;
+                color: #0f1419;
                 margin: 0.2rem 0 0.45rem 0;
             }
             [data-testid="stFileUploader"] {
                 background: #ffffff;
-                border: 2px dashed #93c5fd;
+                border: 2px dashed #1d9bf0;
                 border-radius: 12px;
                 padding: 0.65rem 0.65rem 0.25rem 0.65rem;
             }
             [data-testid="stFileUploader"]:hover {
-                border-color: #60a5fa;
-                background: #f8fbff;
+                border-color: #0f8de4;
+                background: #f1f8fd;
+            }
+            .nav-switch-shell {
+                background: linear-gradient(180deg, #ffffff 0%, #f4f8fb 100%);
+                border: 1px solid #d9e2e8;
+                border-radius: 14px;
+                padding: 0.35rem 0.55rem 0.15rem 0.55rem;
+                margin: 0.2rem 0 0.85rem 0;
+                box-shadow: 0 8px 22px rgba(15, 20, 25, 0.06);
+            }
+            .nav-switch-title {
+                font-size: 0.84rem;
+                color: #536471;
+                font-weight: 700;
+                margin: 0.08rem 0 0.2rem 0.2rem;
+            }
+            div[role="radiogroup"] {
+                gap: 0.55rem;
+            }
+            div[role="radiogroup"] label {
+                background: #ffffff !important;
+                border: 1px solid #cfdae0 !important;
+                border-radius: 12px !important;
+                padding: 0.55rem 0.85rem !important;
+                box-shadow: 0 2px 8px rgba(15, 20, 25, 0.04);
+            }
+            div[role="radiogroup"] label:hover {
+                border-color: #1d9bf0 !important;
+                transform: translateY(-1px);
+                transition: all .15s ease;
+            }
+            div[role="radiogroup"] label p {
+                font-weight: 800 !important;
+                color: #0f1419 !important;
+            }
+            div[role="radiogroup"] label:has(input:checked) {
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
+                border-color: #1d9bf0 !important;
+                box-shadow: 0 8px 18px rgba(29, 155, 240, 0.25);
+            }
+            div[role="radiogroup"] label:has(input:checked) p {
+                color: #ffffff !important;
             }
             button[data-baseweb="tab"] {
                 font-weight: 800 !important;
                 font-size: 1.05rem !important;
             }
             .stButton > button {
-                background: linear-gradient(135deg, #2563eb, #0891b2) !important;
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
                 color: #ffffff !important;
                 border: none !important;
                 font-weight: 700 !important;
             }
             .stButton > button:hover {
-                background: linear-gradient(135deg, #1d4ed8, #0e7490) !important;
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
             }
             div[data-testid="stFormSubmitButton"] > button {
-                background: linear-gradient(135deg, #2563eb, #0891b2) !important;
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
                 color: #ffffff !important;
                 border: none !important;
                 font-weight: 700 !important;
             }
             div[data-testid="stFormSubmitButton"] > button:hover {
-                background: linear-gradient(135deg, #1d4ed8, #0e7490) !important;
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
                 color: #ffffff !important;
             }
-            section[data-testid="stSidebar"] { background:linear-gradient(180deg,#111827 0%,#1f2937 100%); }
-            section[data-testid="stSidebar"] * { color:#e5e7eb !important; }
+            div[data-testid="stDownloadButton"] > button {
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
+                color: #ffffff !important;
+                border: 1px solid #1d9bf0 !important;
+                font-weight: 800 !important;
+            }
+            div[data-testid="stDownloadButton"] > button:hover {
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
+                color: #ffffff !important;
+                border: 1px solid #0f8de4 !important;
+            }
+            section[data-testid="stSidebar"] { background:linear-gradient(180deg,#0f1419 0%,#15202b 100%); }
+            section[data-testid="stSidebar"] * { color:#f7f9f9 !important; }
+            /* Champs de saisie sidebar: texte noir visible sur fond clair */
+            section[data-testid="stSidebar"] div[data-baseweb="input"] input {
+                color: #0f1419 !important;
+                background: #ffffff !important;
+                caret-color: #0f1419 !important;
+                -webkit-text-fill-color: #0f1419 !important;
+            }
+            section[data-testid="stSidebar"] div[data-baseweb="input"] {
+                background: #ffffff !important;
+                border: 1px solid #0f1419 !important;
+                border-radius: 10px !important;
+            }
+            section[data-testid="stSidebar"] div[data-baseweb="input"] input::placeholder {
+                color: #6b7b88 !important;
+                opacity: 1 !important;
+            }
+            section[data-testid="stSidebar"] div[data-baseweb="input"] button {
+                color: #0f1419 !important;
+                background: #ffffff !important;
+            }
+            section[data-testid="stSidebar"] div[data-baseweb="input"] button svg {
+                fill: #0f1419 !important;
+            }
+            .sidebar-status-ok {
+                background: linear-gradient(135deg, #e8f5fe, #dff1ff);
+                border: 1px solid #1d9bf0;
+                color: #0f1419;
+                border-radius: 10px;
+                padding: 0.5rem 0.62rem;
+                font-weight: 800;
+                margin-top: 0.25rem;
+            }
+            .sidebar-status-warn {
+                background: linear-gradient(135deg, #edf7ff, #e3f3ff);
+                border: 1px solid #4aa3e8;
+                color: #0f1419;
+                border-radius: 10px;
+                padding: 0.5rem 0.62rem;
+                font-weight: 800;
+                margin-top: 0.25rem;
+            }
+            .sidebar-status-error {
+                background: linear-gradient(135deg, #eef8ff, #e1f1ff);
+                border: 1px solid #1d9bf0;
+                color: #0f1419;
+                border-radius: 10px;
+                padding: 0.5rem 0.62rem;
+                font-weight: 800;
+                margin-top: 0.25rem;
+            }
+            section[data-testid="stSidebar"] .sidebar-status-ok,
+            section[data-testid="stSidebar"] .sidebar-status-ok * { color: #0f1419 !important; }
+            section[data-testid="stSidebar"] .sidebar-status-warn,
+            section[data-testid="stSidebar"] .sidebar-status-warn * { color: #0f1419 !important; }
+            section[data-testid="stSidebar"] .sidebar-status-error,
+            section[data-testid="stSidebar"] .sidebar-status-error * { color: #0f1419 !important; }
+            /* Boutons sidebar (Déconnexion + Réveiller l'API) : barre sombre visible dès le départ */
+            section[data-testid="stSidebar"] .stButton > button {
+                width: 100% !important;
+                min-height: 48px !important;
+                border-radius: 12px !important;
+                padding: 0.2rem 0.6rem !important;
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
+                color: #ffffff !important;
+                border: 1px solid #1d9bf0 !important;
+                font-weight: 900 !important;
+                box-shadow: 0 8px 18px rgba(29, 155, 240, 0.25) !important;
+                outline: none !important;
+            }
+            section[data-testid="stSidebar"] .stButton > button:hover {
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
+                border: 1px solid #0f8de4 !important;
+            }
+            section[data-testid="stSidebar"] .stButton > button:focus,
+            section[data-testid="stSidebar"] .stButton > button:focus-visible,
+            section[data-testid="stSidebar"] .stButton > button:active {
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
+                color: #ffffff !important;
+                border: 1px solid #0f8de4 !important;
+                outline: none !important;
+                box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.25) !important;
+            }
+            /* Ciblage robuste du bouton "Réveiller l'API" (clé Streamlit) */
+            section[data-testid="stSidebar"] .st-key-sidebar_warmup_api button {
+                width: 100% !important;
+                min-height: 48px !important;
+                border-radius: 12px !important;
+                padding: 0.2rem 0.6rem !important;
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
+                color: #ffffff !important;
+                border: 1px solid #1d9bf0 !important;
+                box-shadow: 0 8px 18px rgba(29, 155, 240, 0.25) !important;
+                outline: none !important;
+            }
+            section[data-testid="stSidebar"] .st-key-sidebar_warmup_api button:hover,
+            section[data-testid="stSidebar"] .st-key-sidebar_warmup_api button:focus,
+            section[data-testid="stSidebar"] .st-key-sidebar_warmup_api button:active {
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
+                color: #ffffff !important;
+                border: 1px solid #0f8de4 !important;
+            }
+            section[data-testid="stSidebar"] .st-key-sidebar_warmup_api button p {
+                color: #ffffff !important;
+                font-weight: 900 !important;
+                margin: 0 !important;
+            }
+            /* Boutons + / - de st.number_input bien visibles */
+            section[data-testid="stSidebar"] [data-testid="stNumberInputStepUp"],
+            section[data-testid="stSidebar"] [data-testid="stNumberInputStepDown"] {
+                color: #0f1419 !important;
+                opacity: 1 !important;
+            }
+            section[data-testid="stSidebar"] [data-testid="stNumberInputStepUp"] svg,
+            section[data-testid="stSidebar"] [data-testid="stNumberInputStepDown"] svg {
+                fill: #0f1419 !important;
+                stroke: #0f1419 !important;
+                opacity: 1 !important;
+            }
+            /* Uniformise tous les champs en bordure noire (normal/focus/erreur) */
+            div[data-baseweb="input"] {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+            }
+            div[data-baseweb="input"]:focus-within {
+                border: 1px solid #0f1419 !important;
+                box-shadow: 0 0 0 1px #0f1419 !important;
+            }
+            div[data-baseweb="base-input"][aria-invalid="true"],
+            div[data-baseweb="input"][aria-invalid="true"] {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+            }
+            /* Number input (Lignes max) : jamais rouge */
+            div[data-baseweb="input"][data-testid="stNumberInputField"] {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within {
+                border: 1px solid #0f1419 !important;
+                box-shadow: 0 0 0 1px #0f1419 !important;
+            }
+            div[data-testid="stNumberInput"] div[data-baseweb="input"][aria-invalid="true"],
+            div[data-testid="stNumberInput"] div[data-baseweb="input"][data-invalid="true"] {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+            }
+            /* Look & feel proche du bloc "Entrez un tweet..." */
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+                border: 2px solid #1d9bf0 !important;
+                border-radius: 12px !important;
+                background: #ffffff !important;
+                box-shadow: none !important;
+                overflow: hidden !important;
+            }
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within {
+                border: 2px solid #0f8de4 !important;
+                box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.18) !important;
+            }
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input[type="number"] {
+                color: #0f1419 !important;
+                background: #ffffff !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+                -webkit-text-fill-color: #0f1419 !important;
+            }
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input[type="number"]:focus,
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input[type="number"]:invalid {
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] [data-testid="stNumberInputStepUp"],
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] [data-testid="stNumberInputStepDown"] {
+                background: #ffffff !important;
+                border-left: 1px solid #d1e5f5 !important;
+                color: #0f1419 !important;
+            }
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] [data-testid="stNumberInputStepUp"]:hover,
+            section[data-testid="stSidebar"] div[data-testid="stNumberInput"] [data-testid="stNumberInputStepDown"]:hover {
+                background: #eef8ff !important;
+            }
+            /* Neutralise les contours rouges natifs navigateur/invalid */
+            input:invalid,
+            input:focus:invalid,
+            textarea:invalid,
+            textarea:focus:invalid {
+                border-color: #0f1419 !important;
+                box-shadow: none !important;
+                outline: none !important;
+            }
+            input::-moz-ui-invalid,
+            textarea::-moz-ui-invalid {
+                box-shadow: none !important;
+            }
+            /* BaseWeb peut ajouter un anneau rouge via pseudo-élément */
+            div[data-baseweb="input"]::before,
+            div[data-baseweb="input"]::after,
+            div[data-baseweb="base-input"]::before,
+            div[data-baseweb="base-input"]::after,
+            div[data-baseweb="textarea"]::before,
+            div[data-baseweb="textarea"]::after {
+                border-color: #0f1419 !important;
+                box-shadow: none !important;
+            }
+            /* Override total sur NumberInput pour tuer le contour rouge persistant */
+            section[data-testid="stSidebar"] [data-testid="stNumberInput"] *,
+            section[data-testid="stSidebar"] [data-testid="stNumberInput"] *::before,
+            section[data-testid="stSidebar"] [data-testid="stNumberInput"] *::after {
+                border-color: #0f1419 !important;
+                box-shadow: none !important;
+                outline: none !important;
+            }
+            section[data-testid="stSidebar"] [data-testid="stNumberInput"] [role="presentation"] {
+                border: 2px solid #1d9bf0 !important;
+                border-radius: 12px !important;
+                overflow: hidden !important;
+            }
+            /* Textarea "Entrez un tweet..." : supprime rouge et force bordure noire */
+            div[data-testid="stTextArea"] textarea {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+                outline: none !important;
+            }
+            div[data-testid="stTextArea"] textarea:focus {
+                border: 1px solid #0f1419 !important;
+                box-shadow: 0 0 0 1px #0f1419 !important;
+                outline: none !important;
+            }
+            div[data-baseweb="textarea"] {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+            }
+            div[data-baseweb="textarea"]:focus-within {
+                border: 1px solid #0f1419 !important;
+                box-shadow: 0 0 0 1px #0f1419 !important;
+            }
+            div[data-testid="stTextArea"][aria-invalid="true"] textarea,
+            div[data-testid="stTextArea"] textarea[aria-invalid="true"],
+            div[data-baseweb="textarea"][aria-invalid="true"],
+            div[data-baseweb="textarea"][data-invalid="true"] {
+                border: 1px solid #0f1419 !important;
+                box-shadow: none !important;
+                outline: none !important;
+            }
         </style>
         """,
         unsafe_allow_html=True,
@@ -289,37 +590,37 @@ def _render_login_screen() -> bool:
             .login-card {
                 width: 100%;
                 max-width: 620px;
-                background: linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(239,246,255,0.96) 100%);
-                border: 1px solid #bfdbfe;
+                background: linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(241,248,253,0.96) 100%);
+                border: 1px solid #cfd9de;
                 border-radius: 22px;
                 padding: 1.1rem 1.3rem 1.1rem 1.3rem;
-                box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+                box-shadow: 0 18px 40px rgba(15, 20, 25, 0.14);
             }
             .login-title {
                 font-size: 1.5rem;
                 font-weight: 900;
-                color: #1e40af;
+                color: #0f1419;
                 margin-bottom: 0.3rem;
                 text-align: center;
             }
             .login-subtitle {
                 font-size: 0.98rem;
-                color: #334155;
+                color: #536471;
                 text-align: center;
                 margin-bottom: 0.95rem;
                 font-weight: 800;
             }
             .auth-hint {
                 font-weight: 800;
-                color: #1e3a8a;
+                color: #0f1419;
                 text-align: center;
                 margin-top: 0.6rem;
                 font-size: 0.85rem;
             }
             .auth-msg {
-                border: 1px solid #93c5fd;
-                background: #eff6ff;
-                color: #1e40af;
+                border: 1px solid #1d9bf0;
+                background: #eef8ff;
+                color: #0f1419;
                 border-radius: 10px;
                 padding: 0.55rem 0.7rem;
                 margin-top: 0.55rem;
@@ -328,27 +629,27 @@ def _render_login_screen() -> bool:
                 text-align: center;
             }
             div[data-testid="stForm"] button[kind="primary"] {
-                background: linear-gradient(135deg, #16a34a, #22c55e) !important;
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
                 color: #ffffff !important;
                 border: none !important;
                 font-weight: 800 !important;
             }
             div[data-testid="stForm"] button[kind="primary"]:hover {
-                background: linear-gradient(135deg, #15803d, #16a34a) !important;
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
                 color: #ffffff !important;
             }
             div[data-testid="stFormSubmitButton"] > button {
-                background: linear-gradient(135deg, #16a34a, #22c55e) !important;
+                background: linear-gradient(135deg, #0f1419, #1d9bf0) !important;
                 color: #ffffff !important;
                 border: none !important;
                 font-weight: 800 !important;
             }
             div[data-testid="stFormSubmitButton"] > button:hover {
-                background: linear-gradient(135deg, #15803d, #16a34a) !important;
+                background: linear-gradient(135deg, #15202b, #0f8de4) !important;
                 color: #ffffff !important;
             }
             .login-card div[data-testid="stForm"] div[data-testid="stTextInput"] input {
-                border: 2px solid #93c5fd !important;
+                border: 2px solid #1d9bf0 !important;
                 border-radius: 10px !important;
                 background: #ffffff !important;
             }
@@ -428,10 +729,8 @@ def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
             body = health.json()
             if "predict_ready" in body and body.get("predict_ready") is False:
                 raise RuntimeError(
-                    "Côté serveur, aucune prédiction n'est autorisée pour l'instant : le modèle MLflow "
-                    "n'est pas chargé et le repli heuristique est désactivé (ALLOW_HEURISTIC_FALLBACK). "
-                    "Sur Render : mettez ALLOW_HEURISTIC_FALLBACK=true ou configurez DAGSHUB_USER_TOKEN "
-                    "+ MLFLOW_TRACKING_USERNAME, puis redéployez. "
+                    "Côté serveur, aucune prédiction n'est autorisée pour l'instant. "
+                    "Vérifiez que le modèle est bien chargé sur votre Hugging Face Space. "
                     f"Réponse /health : {body}"
                 )
     except RuntimeError:
@@ -458,7 +757,7 @@ def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
                 raise RuntimeError(
                     "Erreur serveur 503 — "
                     + _api_error_detail(response)
-                    + " Si le texte indique MLflow ou le modèle, corrigez le déploiement Render ; sinon réessayez après le cold start."
+                    + " Le Hugging Face Space est peut-être en train de démarrer (cold start), réessayez dans un instant."
                 )
             detail = _api_error_detail(response)
             raise RuntimeError(f"Erreur API {response.status_code}: {detail}")
@@ -473,7 +772,7 @@ def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
             raise RuntimeError(
                 "Erreur serveur 503 après plusieurs tentatives — "
                 + _api_error_detail(last_response)
-                + " Utilisez « Réveiller l'API » puis réessayez, ou vérifiez que le modèle est bien chargé côté Render."
+                + " Utilisez « Réveiller l'API » puis réessayez, ou vérifiez que le modèle est bien chargé côté Hugging Face."
             )
         if not last_response.ok:
             raise RuntimeError(f"Erreur API {last_response.status_code}: {_api_error_detail(last_response)}")
@@ -599,12 +898,17 @@ def resolve_geo_coords(payload: Dict[str, str], pred: Dict[str, Any]) -> List[Li
 def render_prediction_result(payload: Dict[str, str], pred: Dict[str, Any], context_key: str) -> None:
     """Affiche tout le bloc résultat : métriques Oui/Non, score, graphique des mots, carte."""
     section_title("icon-kpi", "Resultat de prediction")
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown(f"**Mot-cle**: `{payload.get('keyword', '') or 'N/A'}`")
-    st.markdown(f"**Emplacement**: `{payload.get('location', '') or 'N/A'}`")
+    top_card = st.container()
+    top_card.markdown(f"**Mot-cle**: `{payload.get('keyword', '') or 'N/A'}`")
+    top_card.markdown(f"**Emplacement**: `{payload.get('location', '') or 'N/A'}`")
+    if pred.get("detected_lang", "en") not in {"en", "eng"}:
+        top_card.info(f"Langue detectee: `{pred.get('detected_lang', 'unknown')}` — traduction automatique utilisee.")
+        translated_text = pred.get("translated_text")
+        if translated_text:
+            top_card.caption(f"Traduction: {translated_text}")
     analyzed_text = pred.get("clean_text") or payload.get("text", "")
-    st.markdown(f"**Tweet analyse**: {analyzed_text}")
-    c1, c2, c3 = st.columns(3)
+    top_card.markdown(f"**Tweet analyse**: {analyzed_text}")
+    c1, c2, c3 = top_card.columns(3)
     c1.metric("Catastrophe", "Oui" if pred["is_disaster"] else "Non")
     # Compatibilite avec plusieurs schemas d'API:
     # - schema actuel de ton projet: `score`, `impact_words`, `geo_coords`
@@ -626,21 +930,16 @@ def render_prediction_result(payload: Dict[str, str], pred: Dict[str, Any], cont
     # Infos complementaires renvoyees par certaines APIs (ex: backend Render).
     model_name = pred.get("model_name")
     if model_name:
-        st.markdown(f"**Modele utilise**: `{model_name}`")
+        top_card.markdown(f"**Modele utilise**: `{model_name}`")
     clean_text = pred.get("clean_text")
     if clean_text:
-        st.caption(f"Texte nettoye: {clean_text}")
+        top_card.caption(f"Texte nettoye: {clean_text}")
 
-    st.markdown("</div>", unsafe_allow_html=True)
     left, right = st.columns([1.3, 1])
     with left:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         plot_impact_words(impact_words, chart_key=f"impact_chart_{context_key}")
-        st.markdown("</div>", unsafe_allow_html=True)
     with right:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         plot_map(resolved_geo_coords, map_key=f"folium_map_{context_key}")
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def manual_prediction() -> None:
@@ -685,7 +984,7 @@ def manual_prediction() -> None:
                 "Texte traduit (envoye au modele)",
                 value=translation_meta.get("text_for_prediction", ""),
                 height=100,
-                key=f"manual_translation_preview_{st.session_state.get('manual_result_version', 0)}",
+                key="manual_translation_preview",
             )
         render_prediction_result(
             st.session_state["manual_last_payload"],
@@ -718,17 +1017,6 @@ def batch_csv_prediction(max_rows: int) -> None:
     vers l'API, tableau des résultats et bouton de téléchargement.
     """
     st.markdown('<div class="section-box-title"><strong>📊 Analyse par lot (CSV)</strong></div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="csv-help-card">
-            <div class="csv-help-title">📄 Colonnes attendues (format flexible)</div>
-            <div class="csv-help-line">✅ <strong>Obligatoire</strong> : une colonne <code>text</code>, <code>tweet</code>, <code>message</code>, <code>content</code> ou <code>texte</code></div>
-            <div class="csv-help-line">➕ <strong>Optionnel</strong> : <code>keyword</code> / <code>mot_cle</code>, <code>location</code> / <code>lieu</code> / <code>place</code></div>
-            <div class="csv-help-line">⚙️ Chaque ligne est envoyée à <code>/predict</code>, puis regroupée dans un tableau exportable.</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
     st.markdown('<div class="csv-uploader-title">⬆️ Charger un fichier CSV</div>', unsafe_allow_html=True)
     uploaded = st.file_uploader(
         "Charger un fichier CSV",
@@ -847,7 +1135,7 @@ def batch_csv_prediction(max_rows: int) -> None:
                 st.session_state["batch_show_block_view"] = not st.session_state.get("batch_show_block_view", False)
 
         if st.session_state.get("batch_show_block_view", False):
-            st.markdown('<div class="card">', unsafe_allow_html=True)
+            block_container = st.container()
             ok_mask = out_df.get("api_error", "").astype(str).str.strip().eq("")
             success_df = out_df[ok_mask] if "api_error" in out_df.columns else out_df
             total_rows = len(out_df)
@@ -856,13 +1144,14 @@ def batch_csv_prediction(max_rows: int) -> None:
             if "is_disaster" in success_df.columns:
                 disaster_rows = int(success_df["is_disaster"].fillna(False).astype(bool).sum())
             non_disaster_rows = max(0, success_rows - disaster_rows)
-            error_rows = max(0, total_rows - success_rows)
+            denom = max(success_rows, 1)
+            disaster_pct = (disaster_rows / denom) * 100.0
+            non_disaster_pct = (non_disaster_rows / denom) * 100.0
 
-            m1, m2, m3, m4 = st.columns(4)
+            m1, m2, m3 = block_container.columns(3)
             m1.metric("Lignes totales", str(total_rows))
-            m2.metric("Catastrophe (Oui)", str(disaster_rows))
-            m3.metric("Catastrophe (Non)", str(non_disaster_rows))
-            m4.metric("Erreurs", str(error_rows))
+            m2.metric("Catastrophe (Oui)", f"{disaster_pct:.1f}% ({disaster_rows})")
+            m3.metric("Catastrophe (Non)", f"{non_disaster_pct:.1f}% ({non_disaster_rows})")
 
             summary_lines: List[str] = []
             for _, row in out_df.iterrows():
@@ -883,15 +1172,14 @@ def batch_csv_prediction(max_rows: int) -> None:
                         score_txt = str(score_raw)
                 summary_lines.append(f"Ligne {idx} | Catastrophe: {status} | Score: {score_txt} | Texte: {txt}")
 
-            st.markdown("**Vue en bloc (résumé ligne par ligne)**")
-            st.text_area(
+            block_container.markdown("**Vue en bloc (résumé ligne par ligne)**")
+            block_container.text_area(
                 "Résumé bloc",
                 value="\n".join(summary_lines),
                 height=320,
                 key="batch_block_summary_textarea",
                 label_visibility="collapsed",
             )
-            st.markdown("</div>", unsafe_allow_html=True)
 
 
 def sidebar_controls() -> Dict[str, Any]:
@@ -918,10 +1206,10 @@ def sidebar_controls() -> Dict[str, Any]:
     section_title("icon-health", "Etat systeme", sidebar=True)
     health_url = health_url_from_predict_url(api_url)
     if st.sidebar.button(
-        "Réveiller l'API maintenant",
+        "⏻",
         width="stretch",
         key="sidebar_warmup_api",
-        help="Force plusieurs appels à /health pour réveiller le service (ex. Render en veille). Peut prendre 1 à 2 minutes.",
+        help="Réveiller l'API maintenant : force plusieurs appels à /health (utile en cas de veille/cold start).",
     ):
         warm_box = st.sidebar.empty()
         warm_box.info("Réveil en cours… Le premier démarrage du serveur peut prendre 1 à 2 minutes.")
@@ -954,19 +1242,29 @@ def sidebar_controls() -> Dict[str, Any]:
             if i < 11:
                 time.sleep(5)
         if ok:
-            warm_box.success(f"API joignable.{model_loaded_msg}")
+            warm_box.markdown(
+                f'<div class="sidebar-status-ok">API joignable.{model_loaded_msg}</div>',
+                unsafe_allow_html=True,
+            )
         else:
-            warm_box.warning(
-                f"Le service ne répond pas encore comme prévu. Réessayez dans un instant ou relancez l'analyse. ({last_err})"
+            warm_box.markdown(
+                '<div class="sidebar-status-warn">'
+                + "Le service ne répond pas encore comme prévu. "
+                + f"Réessayez dans un instant ou relancez l'analyse. ({last_err})"
+                + "</div>",
+                unsafe_allow_html=True,
             )
     try:
         health = requests.get(health_url, timeout=12)
         if health.ok:
-            st.sidebar.success("API connectee")
+            st.sidebar.markdown('<div class="sidebar-status-ok">API connectee</div>', unsafe_allow_html=True)
         else:
-            st.sidebar.warning("API repond avec un statut inattendu")
+            st.sidebar.markdown('<div class="sidebar-status-warn">API repond avec un statut inattendu</div>', unsafe_allow_html=True)
     except Exception as exc:
-        st.sidebar.error(f"API non joignable ({type(exc).__name__})")
+        st.sidebar.markdown(
+            f'<div class="sidebar-status-error" style="color:#0f1419 !important;">API non joignable ({type(exc).__name__})</div>',
+            unsafe_allow_html=True,
+        )
     return {"api_url": api_url, "max_batch_rows": int(max_batch_rows)}
 
 
@@ -982,10 +1280,18 @@ def main() -> None:
     global API_URL
     API_URL = controls["api_url"]
     render_header()
-    tab_manual, tab_batch = st.tabs(["📝 Analyse manuelle", "📊 Analyse par lot (CSV)"])
-    with tab_manual:
+    st.markdown('<div class="nav-switch-title">Navigation des modules</div>', unsafe_allow_html=True)
+    selected_view = st.radio(
+        "Navigation des modules",
+        options=["📝 Analyse manuelle", "📊 Analyse par lot (CSV)"],
+        horizontal=True,
+        key="top_nav_mode",
+        label_visibility="collapsed",
+    )
+
+    if selected_view.startswith("📝"):
         manual_prediction()
-    with tab_batch:
+    else:
         batch_csv_prediction(controls["max_batch_rows"])
 
 
