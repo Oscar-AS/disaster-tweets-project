@@ -1,0 +1,20 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+# Ignorer globalement :
+# - E402 : imports pas en haut de cellule (normal dans les notebooks)
+# - E712 : comparaison à True/False (style courant en data science)
+# - F811 : redéfinition d'import entre cellules (normal dans les notebooks)
+# - F821 : variable non définie dans la cellule (définie dans une cellule précédente)
+ignore = ["E402", "E712", "F811", "F821"]
+
+[tool.ruff.lint.per-file-ignores]
+# Les notebooks ont des contraintes structurelles — on tolère les lignes longues
+"*.ipynb" = ["E501"]
+# Le dashboard Streamlit contient du CSS/HTML inline dans des chaînes Python
+# Ces lignes ne peuvent pas être découpées sans casser le rendu
+"dashboard/**/*.py" = ["E501"]
