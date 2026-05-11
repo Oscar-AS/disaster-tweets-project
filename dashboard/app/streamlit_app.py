@@ -22,13 +22,20 @@ Vocabulaire utile :
 ================================================================================
 """
 
-# --- Etape 1 : outils Python de base (bibliothèques / "boîtes à outils") ---
-import sys  # Chemins d'exécution et accès au système
-import time  # Attentes entre deux essais si l'API répond mal (cold start)
-import os  # Lecture optionnelle de mots de passe via variables d'environnement
-import re  # Recherche de mots dans le texte (pour graphique d'impact local)
-from pathlib import Path  # Manipulation propre des dossiers et fichiers
-from typing import Any, Dict, List  # Étiquettes pour clarifier le type des données
+import os
+import re
+import sys
+import time
+from pathlib import Path
+from typing import Any, Dict, List
+
+import folium
+import pandas as pd
+import plotly.express as px
+import requests
+import streamlit as st
+from streamlit_extras.metric_cards import style_metric_cards
+from streamlit_folium import st_folium
 
 # Dossier racine du projet (le dossier parent du dossier `app/`)
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -36,7 +43,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.bootstrap import ensure_packages
+from src.bootstrap import ensure_packages  # noqa: E402
 
 # Si des paquets manquent sur la machine, ils sont installés automatiquement (pip)
 ensure_packages(
@@ -52,15 +59,6 @@ ensure_packages(
         ("langdetect", "langdetect"),
     ]
 )
-
-# --- Etape 2 : outils pour carte, tableaux, graphiques, web ---
-import folium  # Carte du monde (points géographiques)
-import pandas as pd  # Tableaux de données (comme un petit Excel en mémoire)
-import plotly.express as px  # Graphiques en barres interactifs
-import requests  # Appels HTTP vers l'API de prédiction et /health
-import streamlit as st  # Tout l'affichage web : boutons, onglets, formulaires
-from streamlit_extras.metric_cards import style_metric_cards  # Mise en forme des encarts chiffrés
-from streamlit_folium import st_folium  # Affichage de la carte Folium dans Streamlit
 
 # Adresse par défaut du service de prédiction (modifiable dans la barre latérale)
 API_URL = os.getenv("API_URL", "https://oscarkaf-disaster-tweets-api.hf.space/predict")
@@ -665,20 +663,36 @@ def _render_login_screen() -> bool:
             l1, l2, l3 = st.columns([1.1, 1.6, 1.1])
             with l2:
                 st.image(str(logo_path), width="stretch")
-        st.markdown('<div class="login-title"><strong>Connexion Administrateur</strong></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="login-title"><strong>Connexion Administrateur</strong></div>',
+            unsafe_allow_html=True,
+        )
         with st.form("auth_form", clear_on_submit=False):
             st.markdown("**Mot de passe administrateur**")
-            password_input = st.text_input("Mot de passe administrateur", type="password", key="admin_password_input", label_visibility="collapsed", placeholder="Entrez votre mot de passe")
-            submit_login = st.form_submit_button("🔐 Se connecter", width="stretch", type="primary")
+            password_input = st.text_input(
+                "Mot de passe administrateur",
+                type="password",
+                key="admin_password_input",
+                label_visibility="collapsed",
+                placeholder="Entrez votre mot de passe",
+            )
+            submit_login = st.form_submit_button(
+                "🔐 Se connecter", width="stretch", type="primary"
+            )
         if submit_login:
             if password_input in ADMIN_PASSWORDS:
                 st.session_state["is_authenticated"] = True
                 st.session_state["auth_error"] = ""
                 st.rerun()
             else:
-                st.session_state["auth_error"] = "Mot de passe invalide. Veuillez reessayer."
+                st.session_state["auth_error"] = (
+                    "Mot de passe invalide. Veuillez reessayer."
+                )
         if st.session_state.get("auth_error"):
-            st.markdown(f'<div class="auth-msg"><strong>{st.session_state["auth_error"]}</strong></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="auth-msg"><strong>{st.session_state["auth_error"]}</strong></div>',
+                unsafe_allow_html=True,
+            )
         st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
     return st.session_state.get("is_authenticated", False)
@@ -688,7 +702,7 @@ def health_url_from_predict_url(api_url: str) -> str:
     """URL `/health` dérivée de l’URL `/predict` (ou base seule) saisie dans la barre latérale."""
     u = api_url.strip().rstrip("/")
     if u.endswith("/predict"):
-        return f"{u[:-len('/predict')]}/health"
+        return f"{u[: -len('/predict')]}/health"
     return f"{u}/health"
 
 
@@ -775,12 +789,16 @@ def call_api(payload: Dict[str, str]) -> Dict[str, Any]:
                 + " Utilisez « Réveiller l'API » puis réessayez, ou vérifiez que le modèle est bien chargé côté Hugging Face."
             )
         if not last_response.ok:
-            raise RuntimeError(f"Erreur API {last_response.status_code}: {_api_error_detail(last_response)}")
+            raise RuntimeError(
+                f"Erreur API {last_response.status_code}: {_api_error_detail(last_response)}"
+            )
         return last_response.json()
     raise RuntimeError("API indisponible apres plusieurs tentatives.")
 
 
-def call_api_with_visible_feedback(payload: Dict[str, str], running_label: str) -> Dict[str, Any]:
+def call_api_with_visible_feedback(
+    payload: Dict[str, str], running_label: str
+) -> Dict[str, Any]:
     """
     Comme `call_api`, mais avec une bannière de progression Streamlit : l'utilisateur voit
     clairement que l'analyse est en cours jusqu'à la réponse du serveur.
@@ -797,7 +815,11 @@ def translate_preview_if_needed(text: str) -> Dict[str, str]:
     - si le texte est déjà anglais (ou très court), on le garde
     - sinon on traduit en anglais avant envoi à l'API
     """
-    out = {"text_for_prediction": text, "detected_lang": "unknown", "translated": "false"}
+    out = {
+        "text_for_prediction": text,
+        "detected_lang": "unknown",
+        "translated": "false",
+    }
     stripped = (text or "").strip()
     if not stripped:
         return out
@@ -824,7 +846,9 @@ def translate_preview_if_needed(text: str) -> Dict[str, str]:
     try:
         from deep_translator import GoogleTranslator  # type: ignore[import-untyped]
 
-        translated = GoogleTranslator(source=out["detected_lang"], target="en").translate(stripped)
+        translated = GoogleTranslator(
+            source=out["detected_lang"], target="en"
+        ).translate(stripped)
         if isinstance(translated, str) and translated.strip():
             out["text_for_prediction"] = translated.strip()
             out["translated"] = "true"
@@ -838,9 +862,22 @@ def plot_impact_words(impact_words: Dict[str, float], chart_key: str) -> None:
     if not impact_words:
         st.info("Aucune contribution de mot disponible pour ce tweet.")
         return
-    df = pd.DataFrame({"word": list(impact_words.keys()), "impact": list(impact_words.values())}).sort_values("impact", ascending=False)
-    fig = px.bar(df, x="word", y="impact", color="impact", color_continuous_scale="Tealrose", title="Influence de chaque mot")
-    fig.update_layout(template="plotly_white", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    df = pd.DataFrame(
+        {"word": list(impact_words.keys()), "impact": list(impact_words.values())}
+    ).sort_values("impact", ascending=False)
+    fig = px.bar(
+        df,
+        x="word",
+        y="impact",
+        color="impact",
+        color_continuous_scale="Tealrose",
+        title="Influence de chaque mot",
+    )
+    fig.update_layout(
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     st.plotly_chart(fig, width="stretch", key=chart_key)
 
 
@@ -851,7 +888,13 @@ def compute_local_impact_words(payload: Dict[str, str]) -> Dict[str, float]:
     même afficher un graphique compréhensible.
     """
     raw_text = " ".join(
-        part for part in [payload.get("keyword", ""), payload.get("location", ""), payload.get("text", "")] if part
+        part
+        for part in [
+            payload.get("keyword", ""),
+            payload.get("location", ""),
+            payload.get("text", ""),
+        ]
+        if part
     ).lower()
     tokens = [tok for tok in re.findall(r"[a-zA-Z']+", raw_text) if tok]
 
@@ -879,12 +922,21 @@ def plot_map(geo_coords: List[List[float]], map_key: str) -> None:
     center = geo_coords[0] if geo_coords else [20.0, 0.0]
     fmap = folium.Map(location=center, zoom_start=2, tiles="CartoDB dark_matter")
     for lat, lon in geo_coords:
-        folium.CircleMarker(location=[lat, lon], radius=7, fill=True, color="#60a5fa", fill_color="#38bdf8", fill_opacity=0.9).add_to(fmap)
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=7,
+            fill=True,
+            color="#60a5fa",
+            fill_color="#38bdf8",
+            fill_opacity=0.9,
+        ).add_to(fmap)
     # Cle stable par contexte (manual/live) pour eviter le clignotement.
     st_folium(fmap, width=None, height=420, key=map_key)
 
 
-def resolve_geo_coords(payload: Dict[str, str], pred: Dict[str, Any]) -> List[List[float]]:
+def resolve_geo_coords(
+    payload: Dict[str, str], pred: Dict[str, Any]
+) -> List[List[float]]:
     """Choisit où placer la carte : d'abord ce que l'API envoie, sinon une ville du dictionnaire connu."""
     geo_coords = pred.get("geo_coords", [])
     if geo_coords:
@@ -895,9 +947,12 @@ def resolve_geo_coords(payload: Dict[str, str], pred: Dict[str, Any]) -> List[Li
     return []
 
 
-def render_prediction_result(payload: Dict[str, str], pred: Dict[str, Any], context_key: str) -> None:
+def render_prediction_result(
+    payload: Dict[str, str], pred: Dict[str, Any], context_key: str
+) -> None:
     """Affiche tout le bloc résultat : métriques Oui/Non, score, graphique des mots, carte."""
     section_title("icon-kpi", "Resultat de prediction")
+<<<<<<< HEAD
     top_card = st.container()
     top_card.markdown(f"**Mot-cle**: `{payload.get('keyword', '') or 'N/A'}`")
     top_card.markdown(f"**Emplacement**: `{payload.get('location', '') or 'N/A'}`")
@@ -906,6 +961,19 @@ def render_prediction_result(payload: Dict[str, str], pred: Dict[str, Any], cont
         translated_text = pred.get("translated_text")
         if translated_text:
             top_card.caption(f"Traduction: {translated_text}")
+=======
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown(f"**Mot-cle**: `{payload.get('keyword', '') or 'N/A'}`")
+    st.markdown(f"**Emplacement**: `{payload.get('location', '') or 'N/A'}`")
+
+    # AJOUT: Info Traduction
+    if pred.get("detected_lang", "en") not in ["en", "eng"]:
+        st.info(
+            f"🌍 Langue détectée : `{pred['detected_lang']}`. Traduction automatique utilisée."
+        )
+        st.caption(f"Traduction : {pred.get('translated_text', '')}")
+
+>>>>>>> 492510832b9a038918c6fd869b640540e84720b2
     analyzed_text = pred.get("clean_text") or payload.get("text", "")
     top_card.markdown(f"**Tweet analyse**: {analyzed_text}")
     c1, c2, c3 = top_card.columns(3)
@@ -947,39 +1015,73 @@ def manual_prediction() -> None:
     Onglet « un tweet à la fois » : formulaire, envoi API, mémorisation du dernier résultat,
     message si l'utilisateur modifie le texte sans recliquer sur Analyser.
     """
-    st.markdown('<div class="section-box-title"><strong>📝 Analyse manuelle</strong></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-box-title"><strong>📝 Analyse manuelle</strong></div>',
+        unsafe_allow_html=True,
+    )
     with st.form("manual_prediction_form", clear_on_submit=False):
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown('<div class="strong-box-title"><strong>Mot-cle</strong></div>', unsafe_allow_html=True)
-            keyword = st.text_input("Mot-cle", key="manual_keyword", label_visibility="collapsed")
+            st.markdown(
+                '<div class="strong-box-title"><strong>Mot-cle</strong></div>',
+                unsafe_allow_html=True,
+            )
+            keyword = st.text_input(
+                "Mot-cle", key="manual_keyword", label_visibility="collapsed"
+            )
         with c2:
-            st.markdown('<div class="strong-box-title"><strong>Emplacement</strong></div>', unsafe_allow_html=True)
-            location = st.text_input("Emplacement", key="manual_location", label_visibility="collapsed")
-        st.markdown('<div class="input-box-title"><strong>Entrez un tweet a analyser</strong></div>', unsafe_allow_html=True)
-        text = st.text_area("Entrez un tweet a analyser", height=110, key="manual_text", label_visibility="collapsed")
-        submit_manual = st.form_submit_button("Analyser le tweet", width="stretch", type="primary")
+            st.markdown(
+                '<div class="strong-box-title"><strong>Emplacement</strong></div>',
+                unsafe_allow_html=True,
+            )
+            location = st.text_input(
+                "Emplacement", key="manual_location", label_visibility="collapsed"
+            )
+        st.markdown(
+            '<div class="input-box-title"><strong>Entrez un tweet a analyser</strong></div>',
+            unsafe_allow_html=True,
+        )
+        text = st.text_area(
+            "Entrez un tweet a analyser",
+            height=110,
+            key="manual_text",
+            label_visibility="collapsed",
+        )
+        submit_manual = st.form_submit_button(
+            "Analyser le tweet", width="stretch", type="primary"
+        )
 
     current_payload = {"keyword": keyword, "location": location, "text": text}
     if submit_manual:
         try:
-            translation_meta = translate_preview_if_needed(current_payload.get("text", ""))
+            translation_meta = translate_preview_if_needed(
+                current_payload.get("text", "")
+            )
             payload_for_api = dict(current_payload)
             payload_for_api["text"] = translation_meta["text_for_prediction"]
 
             st.session_state["manual_last_translation"] = translation_meta
-            pred = call_api_with_visible_feedback(payload_for_api, "Analyse du tweet en cours...")
+            pred = call_api_with_visible_feedback(
+                payload_for_api, "Analyse du tweet en cours..."
+            )
             st.session_state["manual_last_payload"] = dict(payload_for_api)
             st.session_state["manual_last_pred"] = pred
-            st.session_state["manual_result_version"] = st.session_state.get("manual_result_version", 0) + 1
+            st.session_state["manual_result_version"] = (
+                st.session_state.get("manual_result_version", 0) + 1
+            )
         except Exception as exc:
             st.error(f"Echec appel API: {exc}")
 
-    if "manual_last_payload" in st.session_state and "manual_last_pred" in st.session_state:
+    if (
+        "manual_last_payload" in st.session_state
+        and "manual_last_pred" in st.session_state
+    ):
         translation_meta = st.session_state.get("manual_last_translation", {})
         if translation_meta.get("translated") == "true":
             st.info("Traduction detectee avant prediction")
-            st.caption(f"Langue detectee: `{translation_meta.get('detected_lang', 'unknown')}`")
+            st.caption(
+                f"Langue detectee: `{translation_meta.get('detected_lang', 'unknown')}`"
+            )
             st.text_area(
                 "Texte traduit (envoye au modele)",
                 value=translation_meta.get("text_for_prediction", ""),
@@ -992,7 +1094,9 @@ def manual_prediction() -> None:
             context_key=f"manual_{st.session_state.get('manual_result_version', 0)}",
         )
         if st.session_state["manual_last_payload"] != current_payload:
-            st.info("Le texte a change. Clique sur 'Analyser le tweet' pour mettre a jour le resultat.")
+            st.info(
+                "Le texte a change. Clique sur 'Analyser le tweet' pour mettre a jour le resultat."
+            )
 
 
 def _csv_column_lookup(df: pd.DataFrame, candidates: tuple[str, ...]) -> str | None:
@@ -1016,8 +1120,30 @@ def batch_csv_prediction(max_rows: int) -> None:
     Onglet fichier : import CSV, détection automatique des colonnes, boucle ligne par ligne
     vers l'API, tableau des résultats et bouton de téléchargement.
     """
+<<<<<<< HEAD
     st.markdown('<div class="section-box-title"><strong>📊 Analyse par lot (CSV)</strong></div>', unsafe_allow_html=True)
     st.markdown('<div class="csv-uploader-title">⬆️ Charger un fichier CSV</div>', unsafe_allow_html=True)
+=======
+    st.markdown(
+        '<div class="section-box-title"><strong>📊 Analyse par lot (CSV)</strong></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <div class="csv-help-card">
+            <div class="csv-help-title">📄 Colonnes attendues (format flexible)</div>
+            <div class="csv-help-line">✅ <strong>Obligatoire</strong> : une colonne <code>text</code>, <code>tweet</code>, <code>message</code>, <code>content</code> ou <code>texte</code></div>
+            <div class="csv-help-line">➕ <strong>Optionnel</strong> : <code>keyword</code> / <code>mot_cle</code>, <code>location</code> / <code>lieu</code> / <code>place</code></div>
+            <div class="csv-help-line">⚙️ Chaque ligne est envoyée à <code>/predict</code>, puis regroupée dans un tableau exportable.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="csv-uploader-title">⬆️ Charger un fichier CSV</div>',
+        unsafe_allow_html=True,
+    )
+>>>>>>> 492510832b9a038918c6fd869b640540e84720b2
     uploaded = st.file_uploader(
         "Charger un fichier CSV",
         type=["csv"],
@@ -1050,16 +1176,25 @@ def batch_csv_prediction(max_rows: int) -> None:
         return
 
     kw_col = _csv_column_lookup(df, ("keyword", "mot-cle", "mot_cle", "key_word"))
-    loc_col = _csv_column_lookup(df, ("location", "lieu", "place", "emplacement", "city"))
+    loc_col = _csv_column_lookup(
+        df, ("location", "lieu", "place", "emplacement", "city")
+    )
 
     n_total = min(len(df), max_rows)
     if len(df) > max_rows:
-        st.warning(f"Le fichier contient {len(df)} lignes. Seules les **{max_rows}** premieres seront traitees.")
+        st.warning(
+            f"Le fichier contient {len(df)} lignes. Seules les **{max_rows}** premieres seront traitees."
+        )
         df_work = df.head(max_rows).copy()
     else:
         df_work = df.copy()
 
-    if st.button("Lancer l'analyse par lot", width="stretch", type="primary", key="batch_run_button"):
+    if st.button(
+        "Lancer l'analyse par lot",
+        width="stretch",
+        type="primary",
+        key="batch_run_button",
+    ):
         results: List[Dict[str, Any]] = []
         progress = st.progress(0, text="Preparation...")
         status_box = st.empty()
@@ -1081,18 +1216,26 @@ def batch_csv_prediction(max_rows: int) -> None:
                 val = row.get(c)
                 base_out[f"input_{c}"] = "" if pd.isna(val) else val
 
-            progress.progress((i + 1) / max(n_total, 1), text=f"Ligne {i + 1} / {n_total}")
+            progress.progress(
+                (i + 1) / max(n_total, 1), text=f"Ligne {i + 1} / {n_total}"
+            )
 
             if len(text_val) < 5:
                 base_out["is_disaster"] = None
                 base_out["score"] = None
                 base_out["clean_text"] = ""
                 base_out["model_name"] = ""
-                base_out["api_error"] = "Texte absent ou trop court (minimum 5 caracteres)."
+                base_out["api_error"] = (
+                    "Texte absent ou trop court (minimum 5 caracteres)."
+                )
                 results.append(base_out)
                 continue
 
-            payload = {"text": text_val, "keyword": keyword_val, "location": location_val}
+            payload = {
+                "text": text_val,
+                "keyword": keyword_val,
+                "location": location_val,
+            }
             try:
                 status_box.info(f"Prediction en cours — ligne {i + 1}/{n_total}...")
                 pred = call_api(payload)
@@ -1115,7 +1258,10 @@ def batch_csv_prediction(max_rows: int) -> None:
         out_df = pd.DataFrame(results)
         st.session_state["batch_results_df"] = out_df
 
-    if "batch_results_df" in st.session_state and st.session_state["batch_results_df"] is not None:
+    if (
+        "batch_results_df" in st.session_state
+        and st.session_state["batch_results_df"] is not None
+    ):
         out_df = st.session_state["batch_results_df"]
         st.subheader("Resultats")
         st.dataframe(out_df, width="stretch", hide_index=True)
@@ -1131,8 +1277,12 @@ def batch_csv_prediction(max_rows: int) -> None:
                 key="batch_download_csv",
             )
         with actions_right:
-            if st.button("Visualiser en bloc", width="stretch", key="batch_view_block_button"):
-                st.session_state["batch_show_block_view"] = not st.session_state.get("batch_show_block_view", False)
+            if st.button(
+                "Visualiser en bloc", width="stretch", key="batch_view_block_button"
+            ):
+                st.session_state["batch_show_block_view"] = not st.session_state.get(
+                    "batch_show_block_view", False
+                )
 
         if st.session_state.get("batch_show_block_view", False):
             block_container = st.container()
@@ -1142,7 +1292,9 @@ def batch_csv_prediction(max_rows: int) -> None:
             success_rows = len(success_df)
             disaster_rows = 0
             if "is_disaster" in success_df.columns:
-                disaster_rows = int(success_df["is_disaster"].fillna(False).astype(bool).sum())
+                disaster_rows = int(
+                    success_df["is_disaster"].fillna(False).astype(bool).sum()
+                )
             non_disaster_rows = max(0, success_rows - disaster_rows)
             denom = max(success_rows, 1)
             disaster_pct = (disaster_rows / denom) * 100.0
@@ -1170,7 +1322,9 @@ def batch_csv_prediction(max_rows: int) -> None:
                         score_txt = f"{float(score_raw):.4f}"
                     except Exception:
                         score_txt = str(score_raw)
-                summary_lines.append(f"Ligne {idx} | Catastrophe: {status} | Score: {score_txt} | Texte: {txt}")
+                summary_lines.append(
+                    f"Ligne {idx} | Catastrophe: {status} | Score: {score_txt} | Texte: {txt}"
+                )
 
             block_container.markdown("**Vue en bloc (résumé ligne par ligne)**")
             block_container.text_area(
@@ -1195,6 +1349,10 @@ def sidebar_controls() -> Dict[str, Any]:
         st.rerun()
     section_title("icon-config", "Configuration", sidebar=True)
     api_url = st.sidebar.text_input("URL API", value=API_URL, key="sidebar_api_url")
+
+    # Le bouton de rafraîchissement MLflow a été retiré car le modèle
+    # est désormais chargé en dur via Hugging Face Transformers.
+
     max_batch_rows = st.sidebar.number_input(
         "Lignes max (analyse par lot CSV)",
         min_value=10,
@@ -1209,10 +1367,16 @@ def sidebar_controls() -> Dict[str, Any]:
         "⏻",
         width="stretch",
         key="sidebar_warmup_api",
+<<<<<<< HEAD
         help="Réveiller l'API maintenant : force plusieurs appels à /health (utile en cas de veille/cold start).",
+=======
+        help="Force plusieurs appels à /health pour réveiller le service (ex. Hugging Face Space en veille). Peut prendre 1 à 2 minutes.",
+>>>>>>> 492510832b9a038918c6fd869b640540e84720b2
     ):
         warm_box = st.sidebar.empty()
-        warm_box.info("Réveil en cours… Le premier démarrage du serveur peut prendre 1 à 2 minutes.")
+        warm_box.info(
+            "Réveil en cours… Le premier démarrage du serveur peut prendre 1 à 2 minutes."
+        )
         last_err = ""
         ok = False
         model_loaded_msg = ""
@@ -1227,11 +1391,11 @@ def sidebar_controls() -> Dict[str, Any]:
                         hf = data.get("heuristic_fallback_active")
                         bits = []
                         if ml is not None:
-                            bits.append(f"MLflow chargé : {'oui' if ml else 'non'}")
+                            bits.append(f"Modèle chargé : {'oui' if ml else 'non'}")
                         if hf:
                             bits.append("repli heuristique actif")
                         if data.get("model_load_error") and not ml:
-                            bits.append("voir logs modèle (model_load_error)")
+                            bits.append(f"Erreur: {data.get('model_load_error')}")
                         model_loaded_msg = (" " + " · ".join(bits)) if bits else ""
                     except Exception:
                         model_loaded_msg = ""
@@ -1297,4 +1461,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

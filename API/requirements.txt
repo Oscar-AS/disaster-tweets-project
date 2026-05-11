@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+huggingface_hub
+python-dotenv
+deep-translator
+langdetect
+emoji
+httpx
+torch
+transformers
