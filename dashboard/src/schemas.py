@@ -42,3 +42,4 @@ class PredictResponse(BaseModel):
     impact_words: Dict[str, float]
     # Liste des coordonnees detectees: [[lat, lon], [lat, lon], ...]
     geo_coords: List[List[float]]
+

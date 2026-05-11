@@ -1,6 +1,5 @@
 # "re" sert a nettoyer le texte avec des expressions regulieres.
 import re
-
 # Types de retour attendus pour rendre le code plus lisible.
 from typing import List, Tuple
 
@@ -82,3 +81,4 @@ class TextProcessor:
             dedup[place.lower()] = (place, coords)
         # On renvoie la liste finale sans doublons.
         return list(dedup.values())
+

@@ -15,10 +15,8 @@ rapidement après un clone du projet.
 
 # Vérifie si un module est présent sans l'importer complètement
 import importlib.util
-
 # Permet de lancer la commande d'installation des paquets comme le ferait un humain dans un terminal
 import subprocess
-
 # Accès à l'interpréteur Python actuel (pour appeler `python -m pip ...`)
 import sys
 import warnings
@@ -39,9 +37,7 @@ def ensure_packages(packages: Iterable[Tuple[str, str]]) -> None:
     Exemple : ("pandas", "pandas") signifie « si import pandas échoue, exécute pip install pandas ».
     Si tout est déjà installé, cette fonction ne fait rien.
     """
-    missing = [
-        pip_name for pip_name, import_name in packages if not _is_installed(import_name)
-    ]
+    missing = [pip_name for pip_name, import_name in packages if not _is_installed(import_name)]
     if not missing:
         return
 

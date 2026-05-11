@@ -1,22 +1,26 @@
-import joblib
+# "os" permet de lire des chemins de fichiers et variables d'environnement.
 import os
+# OrderedDict aide a conserver l'ordre d'ajout des impacts de mots.
 from collections import OrderedDict
+# Types Python pour clarifier les entrees/sorties.
 from typing import Any, Dict, Tuple
-
 try:
     import numpy as np
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # fallback: MLflow non utilise / pas installe
     np = None  # type: ignore
-
 try:
     import pandas as pd
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # fallback: MLflow non utilise / pas installe
     pd = None  # type: ignore
 
+# joblib charge le modele ML deja entraine et sauvegarde en .joblib.
+import joblib
+
+# mlflow est utilise pour charger le meilleur modele depuis le MLflow Registry.
 try:
     import mlflow
     import mlflow.pyfunc
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # fallback: MLflow non utilise / pas installe
     mlflow = None  # type: ignore
 
 
@@ -27,9 +31,7 @@ class DisasterDetector:
     # Constructeur: prepare le chemin du modele et charge le modele.
     def __init__(self, model_path: str | None = None) -> None:
         # Priorite: parametre passe -> variable d'env MODEL_PATH -> chemin par defaut.
-        self.model_path = model_path or os.getenv(
-            "MODEL_PATH", "models/disaster_model.joblib"
-        )
+        self.model_path = model_path or os.getenv("MODEL_PATH", "models/disaster_model.joblib")
         # Modele non charge au depart.
         self.model: Any | None = None
         # Modele MLflow pyfunc non charge au depart.
@@ -84,11 +86,7 @@ class DisasterDetector:
                 try:
                     import dagshub  # import local pour ne pas penaliser si non necessaire
 
-                    dagshub.init(
-                        repo_owner="Oscar-AS",
-                        repo_name="disaster-tweets-project",
-                        mlflow=True,
-                    )
+                    dagshub.init(repo_owner="Oscar-AS", repo_name="disaster-tweets-project", mlflow=True)
                 except Exception:
                     # Sans tracking_uri explicite, mlflow tente ses valeurs par defaut.
                     pass
@@ -144,9 +142,7 @@ class DisasterDetector:
         pour la classe positive (catastrophe).
         """
         if self.mlflow_model is None or pd is None or np is None:
-            raise RuntimeError(
-                "MLflow non disponible (mlflow_model/numpy/pandas manquants)."
-            )
+            raise RuntimeError("MLflow non disponible (mlflow_model/numpy/pandas manquants).")
 
         # Formats d'entree courants pour MLflow pyfunc (selon le modele logge).
         input_candidates = [pd.Series([text]), [text], np.array([text])]
@@ -164,9 +160,7 @@ class DisasterDetector:
         # Si rien ne marche, on remonte l'erreur principale (ou un message generic).
         if last_exc is not None:
             raise last_exc
-        raise RuntimeError(
-            "Erreur lors de la prediction MLflow (sortie non interpretable)."
-        )
+        raise RuntimeError("Erreur lors de la prediction MLflow (sortie non interpretable).")
 
     def _extract_disaster_score_from_prediction(self, prediction: Any) -> float | None:
         """
@@ -181,24 +175,8 @@ class DisasterDetector:
 
             # Si 'label' existe, on essaie de cibler la classe positive.
             if "label" in prediction.columns and len(prediction) >= 1:
-                positive_labels = {
-                    "LABEL_1",
-                    "1",
-                    "DISASTER",
-                    "DISASTERS",
-                    "TRUE",
-                    "CAT",
-                    "DIS_CAT",
-                    "YES",
-                }
-                negative_labels = {
-                    "LABEL_0",
-                    "0",
-                    "NON_DISASTER",
-                    "FALSE",
-                    "NOT_DISASTER",
-                    "NO",
-                }
+                positive_labels = {"LABEL_1", "1", "DISASTER", "DISASTERS", "TRUE", "CAT", "DIS_CAT", "YES"}
+                negative_labels = {"LABEL_0", "0", "NON_DISASTER", "FALSE", "NOT_DISASTER", "NO"}
 
                 # Cherche explicitement une ligne positive.
                 for _, row in prediction.iterrows():
@@ -222,31 +200,13 @@ class DisasterDetector:
             return max(0.0, min(1.0, float(row0["score"])))
 
         # 2) Liste de dictionnaires: [{'label': ..., 'score': ...}]
-        if (
-            isinstance(prediction, list)
-            and prediction
-            and isinstance(prediction[0], dict)
-        ):
+        if isinstance(prediction, list) and prediction and isinstance(prediction[0], dict):
             res = prediction[0]
             if "score" in res:
                 score = float(res["score"])
                 label = str(res.get("label", "")).upper()
-                positive_labels = {
-                    "LABEL_1",
-                    "1",
-                    "DISASTER",
-                    "DISASTERS",
-                    "TRUE",
-                    "YES",
-                }
-                negative_labels = {
-                    "LABEL_0",
-                    "0",
-                    "NON_DISASTER",
-                    "FALSE",
-                    "NOT_DISASTER",
-                    "NO",
-                }
+                positive_labels = {"LABEL_1", "1", "DISASTER", "DISASTERS", "TRUE", "YES"}
+                negative_labels = {"LABEL_0", "0", "NON_DISASTER", "FALSE", "NOT_DISASTER", "NO"}
                 if label in positive_labels:
                     return max(0.0, min(1.0, score))
                 if label in negative_labels:
@@ -299,13 +259,9 @@ class DisasterDetector:
             impacts[word] = impact
 
         # Trie par importance absolue pour afficher d'abord les mots les plus influents.
-        return dict(
-            sorted(impacts.items(), key=lambda item: abs(item[1]), reverse=True)
-        )
+        return dict(sorted(impacts.items(), key=lambda item: abs(item[1]), reverse=True))
 
-    def _impact_words_heuristic(
-        self, text: str, reference_score: float
-    ) -> Dict[str, float]:
+    def _impact_words_heuristic(self, text: str, reference_score: float) -> Dict[str, float]:
         """
         Attribution rapide quand on utilise un modele MLflow (evite plusieurs appels reseau).
         Ici on fournit une contribution approximative basee sur la presence de termes de catastrophe.
@@ -319,9 +275,7 @@ class DisasterDetector:
                 impacts[tok] = round(max(0.01, min(0.3, 0.12 * reference_score)), 4)
 
         # On trie par valeur decroissante pour bien remplir le graphique.
-        return dict(
-            sorted(impacts.items(), key=lambda item: abs(item[1]), reverse=True)
-        )
+        return dict(sorted(impacts.items(), key=lambda item: abs(item[1]), reverse=True))
 
     # Fonction appelee par l'API: renvoie decision finale + score + explications.
     def predict(self, text: str) -> Tuple[bool, float, Dict[str, float]]:
@@ -333,3 +287,4 @@ class DisasterDetector:
         is_disaster = score >= 0.5
         # Retour du resultat complet.
         return is_disaster, score, impact_words
+
