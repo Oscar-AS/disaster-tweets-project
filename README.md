@@ -137,7 +137,7 @@ Deux workflows automatisés :
 ### Fonctionnement
 L'API charge le modèle BERTweet **localement** via la bibliothèque `transformers` (pas d'appel externe à l'inférence Hugging Face). Elle intègre :
 
-1. **Détection de langue + traduction automatique** (`langdetect` + `deep-translator`) — supporte les tweets non-anglophones
+1. **Détection de langue + traduction automatique** (`deep-translator` via `GoogleTranslator(source="auto")`) — supporte de manière robuste les tweets non-anglophones, y compris les langues locales isolées.
 2. **Nettoyage du texte** — suppression des URLs, normalisation des mentions (`@user → [USER]`), conversion des emojis
 3. **Prédiction BERTweet** — classification binaire (catastrophe / pas catastrophe)
 4. **Explicabilité par ablation** — importance de chaque mot via suppression et mesure d'impact sur le score

@@ -77,27 +77,22 @@ def get_classifier():
 # --- TRANSLATION UTILS (LRU CACHE) ---
 try:
     from deep_translator import GoogleTranslator
-    from langdetect import detect
 except ImportError:
-    detect = None
     GoogleTranslator = None
 
 
 @lru_cache(maxsize=128)
 def translate_text(text: str) -> Dict[str, str]:
-    res = {"translated_text": text, "detected_lang": "en", "is_translated": False}
-    if not text or not detect or not GoogleTranslator:
+    res = {"translated_text": text, "detected_lang": "auto", "is_translated": False}
+    if not text or not GoogleTranslator:
         return res
     try:
-        lang = detect(text)
-        res["detected_lang"] = lang
-        if lang not in ["en", "eng"]:
-            translated = GoogleTranslator(source=lang, target="en").translate(text)
-            if translated:
-                res["translated_text"] = translated
-                res["is_translated"] = True
-    except Exception:
-        pass
+        translated = GoogleTranslator(source="auto", target="en").translate(text)
+        if translated and translated.strip().lower() != text.strip().lower():
+            res["translated_text"] = translated.strip()
+            res["is_translated"] = True
+    except Exception as e:
+        print(f"Translation exception: {e}")
     return res
 
 

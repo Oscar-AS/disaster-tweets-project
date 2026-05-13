@@ -49,7 +49,6 @@ ensure_packages(
         ("plotly", "plotly"),
         ("requests", "requests"),
         ("deep-translator", "deep_translator"),
-        ("langdetect", "langdetect"),
     ]
 )
 
@@ -794,10 +793,9 @@ def call_api_with_visible_feedback(payload: Dict[str, str], running_label: str) 
 def translate_preview_if_needed(text: str) -> Dict[str, str]:
     """
     Pré-visualise la traduction côté appli :
-    - si le texte est déjà anglais (ou très court), on le garde
-    - sinon on traduit en anglais avant envoi à l'API
+    - on utilise GoogleTranslator en mode auto-détection
     """
-    out = {"text_for_prediction": text, "detected_lang": "unknown", "translated": "false"}
+    out = {"text_for_prediction": text, "detected_lang": "auto", "translated": "false"}
     stripped = (text or "").strip()
     if not stripped:
         return out
@@ -807,29 +805,15 @@ def translate_preview_if_needed(text: str) -> Dict[str, str]:
         return out
 
     try:
-        from langdetect import LangDetectException, detect  # type: ignore[import-untyped]
-
-        try:
-            lang = (detect(stripped) or "").lower()
-        except LangDetectException:
-            return out
-        if not lang:
-            return out
-        out["detected_lang"] = lang
-        if lang in {"en", "eng"}:
-            return out
-    except Exception:
-        return out
-
-    try:
         from deep_translator import GoogleTranslator  # type: ignore[import-untyped]
 
-        translated = GoogleTranslator(source=out["detected_lang"], target="en").translate(stripped)
+        translated = GoogleTranslator(source="auto", target="en").translate(stripped)
         if isinstance(translated, str) and translated.strip():
-            out["text_for_prediction"] = translated.strip()
-            out["translated"] = "true"
+            if translated.strip().lower() != stripped.lower():
+                out["text_for_prediction"] = translated.strip()
+                out["translated"] = "true"
     except Exception:
-        return out
+        pass
     return out
 
 
