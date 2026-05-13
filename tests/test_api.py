@@ -96,8 +96,5 @@ def test_predict_hf_error_fallback(mock_hf):
 def test_predict_empty_text():
     response = client.post("/predict", json={"text": "   "})
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["is_disaster"] is False
-    assert data["confidence"] == 0.0
-    assert data["clean_text"] == ""
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Le texte du tweet ne peut pas être vide."

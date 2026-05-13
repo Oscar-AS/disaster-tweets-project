@@ -6,12 +6,13 @@ Idéal pour Hugging Face Spaces (qui offre ~16Go de RAM).
 
 import os
 import re
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Dict, List, Optional
 
 
 import emoji
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 try:
@@ -31,10 +32,19 @@ except ImportError:
 
 HF_MODEL_ID = os.getenv("HF_MODEL_ID", "Oscarkaf/disaster-tweets-bert")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Précharge le modèle au démarrage de l'API pour éviter la latence à la première requête."""
+    print("Démarrage de l'API, tentative de préchargement du modèle...")
+    get_classifier()
+    yield
+
+
 app = FastAPI(
     title="Disaster Tweet BERT API (Local HF Space)",
     description="API chargeant le modèle localement avec transformers.",
     version="3.0.0",
+    lifespan=lifespan,
 )
 
 # --- MODEL LOADING ---
@@ -241,11 +251,6 @@ def explain_prediction(text: str, base_confidence: float) -> Dict[str, float]:
 # --- ENDPOINTS ---
 
 
-@app.on_event("startup")
-def startup_event():
-    """Précharge le modèle au démarrage de l'API pour éviter la latence à la première requête."""
-    print("Démarrage de l'API, tentative de préchargement du modèle...")
-    get_classifier()
 
 
 @app.get("/")
@@ -278,17 +283,9 @@ def predict_tweet(tweet: TweetInput):
     # 2. Nettoyage
     cleaned_text = clean_text_advanced(work_text)
 
-    # 3. Texte vide → réponse immédiate
+    # 3. Texte vide → Erreur 400
     if not cleaned_text:
-        return PredictionOutput(
-            is_disaster=False,
-            confidence=0.0,
-            clean_text="",
-            model_name="N/A (texte vide)",
-            impact_words={},
-            detected_lang=trans_res["detected_lang"],
-            translated_text=work_text,
-        )
+        raise HTTPException(status_code=400, detail="Le texte du tweet ne peut pas être vide.")
 
     # 4. Prédiction via pipeline local ou fallback
     confidence, error = query_model(cleaned_text)
