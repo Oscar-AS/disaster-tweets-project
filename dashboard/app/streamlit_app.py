@@ -1167,16 +1167,13 @@ def batch_csv_prediction(max_rows: int) -> None:
 
 
 def sidebar_controls() -> Dict[str, Any]:
-    """Colonne de gauche : logo, déconnexion, URL de l'API, limite de lignes, test /health."""
+    """Colonne de gauche : logo, URL de l'API, limite de lignes, test /health."""
     logo_path = ROOT_DIR / "image" / "logo.png"
     if logo_path.exists():
         _, center, _ = st.sidebar.columns([1, 2, 1])
         with center:
             st.image(str(logo_path), width="stretch")
         st.sidebar.write("")
-    if st.sidebar.button("🔓 Deconnexion", width="stretch", key="logout_button"):
-        st.session_state["is_authenticated"] = False
-        st.rerun()
     section_title("icon-config", "Configuration", sidebar=True)
     api_url = st.sidebar.text_input("URL API", value=API_URL, key="sidebar_api_url")
     max_batch_rows = st.sidebar.number_input(
@@ -1253,13 +1250,8 @@ def sidebar_controls() -> Dict[str, Any]:
 
 
 def main() -> None:
-    """Point d'entrée : mise en page → connexion → sinon barre latérale + deux onglets d'analyse."""
+    """Point d'entrée : mise en page → barre latérale + deux onglets d'analyse."""
     setup_page()
-    _init_auth_state()
-    if not st.session_state.get("is_authenticated", False):
-        _render_login_screen()
-        return
-
     controls = sidebar_controls()
     global API_URL
     API_URL = controls["api_url"]
